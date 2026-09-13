@@ -8,8 +8,8 @@ import {
   devolverTodo,
   agregarJoyaAPrestamo,
   quitarJoyaDePrestamo,
-  revertirItemPrestamo,
   editarPrestamo,
+  eliminarPrestamo,
 } from "@/lib/supabase/prestamos";
 import { supabase } from "@/lib/supabase/client";
 import { getDistribuidoras } from "@/lib/supabase/distribuidoras";
@@ -32,10 +32,6 @@ export default function DetallePrestamoPage({ params }) {
   const [resultadosBusqueda, setResultadosBusqueda] = useState([]);
   const [busquedaHecha, setBusquedaHecha] = useState(false);
 
-  // Historial de joyas devueltas/vendidas, y revertir por error
-  const [mostrarHistorial, setMostrarHistorial] = useState(false);
-  const [revirtiendoId, setRevirtiendoId] = useState(null);
-
   // Editar datos generales del préstamo
   const [editandoPrestamo, setEditandoPrestamo] = useState(false);
   const [formEditarPrestamo, setFormEditarPrestamo] = useState({
@@ -44,6 +40,7 @@ export default function DetallePrestamoPage({ params }) {
     notas: "",
   });
   const [guardandoPrestamo, setGuardandoPrestamo] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
 
   const { data: distribuidoras = [] } = useQuery({
     queryKey: ["distribuidoras-activas"],
@@ -76,9 +73,6 @@ export default function DetallePrestamoPage({ params }) {
   // Solo los items que siguen prestados se pueden seleccionar
   const itemsPrestados =
     prestamo?.detalle?.filter((d) => d.estado_item === "prestado") || [];
-
-  const itemsHistorial =
-    prestamo?.detalle?.filter((d) => d.estado_item !== "prestado") || [];
 
   // Resumen: cuántas unidades y cuánto valen las joyas que siguen prestadas
   const cantidadPrestada = itemsPrestados.reduce(
@@ -299,27 +293,6 @@ export default function DetallePrestamoPage({ params }) {
     }
   };
 
-  const handleRevertirItem = async (item) => {
-    if (
-      !confirm(
-        `¿Regresar "${item.producto?.nombre_comercial}" a estado prestado? Se usa cuando se marcó como vendido o devuelto por error.`,
-      )
-    )
-      return;
-
-    setRevirtiendoId(item.id);
-    try {
-      await revertirItemPrestamo(item.id);
-      refrescarPrestamo();
-      queryClient.invalidateQueries({ queryKey: ["admin-productos"] });
-    } catch (error) {
-      console.error("Error al revertir el ítem:", error);
-      alert("Error al revertir: " + error.message);
-    } finally {
-      setRevirtiendoId(null);
-    }
-  };
-
   const handleAbrirEditarPrestamo = () => {
     setFormEditarPrestamo({
       fecha_prestamo: prestamo.fecha_prestamo?.slice(0, 10) || "",
@@ -341,6 +314,26 @@ export default function DetallePrestamoPage({ params }) {
       alert("Error al editar el préstamo: " + error.message);
     } finally {
       setGuardandoPrestamo(false);
+    }
+  };
+
+  const handleEliminarPrestamo = async () => {
+    if (
+      !confirm(
+        "¿Eliminar este préstamo por completo? Esto borra el registro entero, incluyendo todas las joyas que tuvo. No se puede deshacer.",
+      )
+    )
+      return;
+
+    setEliminando(true);
+    try {
+      await eliminarPrestamo(prestamo.id);
+      queryClient.invalidateQueries({ queryKey: ["prestamos"] });
+      router.push("/admin/prestamos");
+    } catch (error) {
+      console.error("Error al eliminar el préstamo:", error);
+      alert("Error al eliminar el préstamo: " + error.message);
+      setEliminando(false);
     }
   };
 
@@ -388,6 +381,15 @@ export default function DetallePrestamoPage({ params }) {
           >
             Editar
           </button>
+          {prestamo.estado === "finalizado" && (
+            <button
+              onClick={handleEliminarPrestamo}
+              disabled={eliminando}
+              className="text-sm text-red-600 hover:text-red-900 underline disabled:opacity-50"
+            >
+              {eliminando ? "Eliminando..." : "Eliminar"}
+            </button>
+          )}
           <button
             onClick={handleDescargarPDF}
             className="text-sm text-blue-600 hover:text-blue-900"
@@ -591,67 +593,6 @@ export default function DetallePrestamoPage({ params }) {
           </tbody>
         </table>
       </div>
-
-      {itemsHistorial.length > 0 && (
-        <div className="bg-white border border-gray-200 p-6 mb-6">
-          <button
-            onClick={() => setMostrarHistorial((v) => !v)}
-            className="text-sm text-gray-700 hover:text-gray-900 underline"
-          >
-            {mostrarHistorial ? "Ocultar" : "Ver"} historial de devueltas /
-            vendidas ({itemsHistorial.length})
-          </button>
-
-          {mostrarHistorial && (
-            <table className="w-full text-sm mt-4">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Código
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Descripción
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Estado
-                  </th>
-                  <th className="px-4 py-2"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {itemsHistorial.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-4 py-2 text-gray-600">
-                      {item.producto?.codigo}
-                    </td>
-                    <td className="px-4 py-2 text-gray-900">
-                      {item.producto?.nombre_comercial}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`px-2 py-1 text-xs uppercase tracking-wider ${estadoLabel[item.estado_item].cls}`}
-                      >
-                        {estadoLabel[item.estado_item].text}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <button
-                        onClick={() => handleRevertirItem(item)}
-                        disabled={revirtiendoId === item.id}
-                        className="text-xs text-blue-600 hover:text-blue-900 underline disabled:opacity-50"
-                      >
-                        {revirtiendoId === item.id
-                          ? "Regresando..."
-                          : "Regresar a prestado"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
 
       {/* MODAL: Agregar joya olvidada */}
       {modalAgregar && (
