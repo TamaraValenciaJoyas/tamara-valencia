@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { confirmarPagoPedidoWeb } from "@/lib/supabase/pedidosWeb";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export async function POST(request) {
   try {
@@ -39,9 +40,11 @@ export async function POST(request) {
 
     // Pago aprobado por Payphone. clientTransactionId es el id del
     // pedido_web: crear la venta real, descontar stock, y marcarlo pagado.
-    await confirmarPagoPedidoWeb(clientTransactionId, {
-      payphone_transaction_id: data.transactionId,
-    });
+    await confirmarPagoPedidoWeb(
+      clientTransactionId,
+      { payphone_transaction_id: data.transactionId },
+      supabaseAdmin,
+    );
 
     return NextResponse.json({
       statusCode: data.statusCode,
