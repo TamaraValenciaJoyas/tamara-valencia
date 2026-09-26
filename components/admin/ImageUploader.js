@@ -1,14 +1,22 @@
 "use client";
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import { supabase } from "@/lib/supabase/client";
 
 // Función para eliminar imagen de Cloudinary via API Route
 const eliminarDeCloudinary = async (public_id) => {
   if (!public_id) return; // Si no hay public_id, no hay nada que eliminar
 
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
   const response = await fetch("/api/cloudinary/delete", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session?.access_token || ""}`,
+    },
     body: JSON.stringify({ public_id }),
   });
 

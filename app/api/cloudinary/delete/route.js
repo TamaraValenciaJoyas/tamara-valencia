@@ -1,4 +1,5 @@
 import { v2 as cloudinary } from "cloudinary";
+import { supabase } from "@/lib/supabase/client";
 
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
@@ -8,6 +9,14 @@ cloudinary.config({
 
 export async function POST(request) {
   try {
+    const token = request.headers.get("authorization")?.replace("Bearer ", "");
+    const { data: sesion } = token
+      ? await supabase.auth.getUser(token)
+      : { data: null };
+    if (!sesion?.user) {
+      return Response.json({ error: "No autorizado" }, { status: 401 });
+    }
+
     const { public_id } = await request.json();
 
     // Validar que venga un public_id

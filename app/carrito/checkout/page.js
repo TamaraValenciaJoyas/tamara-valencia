@@ -4,7 +4,6 @@ import Script from "next/script";
 import Link from "next/link";
 import Image from "next/image";
 import { useCartStore } from "@/lib/cartStore";
-import { crearPedidoWeb } from "@/lib/supabase/pedidosWeb";
 import { formatPrice } from "@/utils/formatters";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
@@ -78,22 +77,14 @@ export default function CheckoutPage() {
     return Object.keys(nuevosErrores).length === 0;
   };
 
-  const construirDetalle = () =>
-    items.map((item) => ({
-      id_producto: item.id,
-      cantidad: item.quantity,
-      precio_unitario: item.precio_final,
-    }));
-
-  const handleConfirmarTransferencia = async () => {
-    if (!validarFormulario()) {
-      mostrarToast("Completa los campos marcados antes de continuar");
-      return;
-    }
-    setProcesando(true);
-    try {
-      await crearPedidoWeb({
-        pedido: {
+  // El servidor calcula los precios y verifica el stock.
+  const registrarPedido = async (metodo_pago) => {
+    const response = await fetch("/api/pedidos-web", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        metodo_pago,
+        cliente: {
           nombre_cliente: form.nombreCliente,
           cedula_cliente: form.cedula,
           celular_cliente: form.celular,
@@ -102,17 +93,43 @@ export default function CheckoutPage() {
           ubicacion_maps: form.ubicacionMaps,
           horario_entrega: form.horarioEntrega,
           notas: form.notas,
-          subtotal,
-          metodo_pago: "transferencia",
         },
-        detalle: construirDetalle(),
-      });
+        items: items.map((item) => ({
+          id_producto: item.id,
+          cantidad: item.quantity,
+        })),
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      const error = new Error(data.error);
+      error.deServidor = true;
+      throw error;
+    }
+    return data;
+  };
 
+  const mensajeDeError = (error, respaldo) =>
+    error.deServidor && error.message ? error.message : respaldo;
+
+  const handleConfirmarTransferencia = async () => {
+    if (!validarFormulario()) {
+      mostrarToast("Completa los campos marcados antes de continuar");
+      return;
+    }
+    setProcesando(true);
+    try {
+      await registrarPedido("transferencia");
       clearCart();
       setPedidoTransferenciaConfirmado(true);
     } catch (error) {
       console.error("Error al registrar el pedido:", error);
-      mostrarToast("Hubo un error al registrar tu pedido. Intenta de nuevo.");
+      mostrarToast(
+        mensajeDeError(
+          error,
+          "Hubo un error al registrar tu pedido. Intenta de nuevo.",
+        ),
+      );
     } finally {
       setProcesando(false);
     }
@@ -125,25 +142,22 @@ export default function CheckoutPage() {
     }
     setProcesando(true);
     try {
-      const pedido = await crearPedidoWeb({
-        pedido: {
-          nombre_cliente: form.nombreCliente,
-          cedula_cliente: form.cedula,
-          celular_cliente: form.celular,
-          nombre_receptor: form.nombreReceptor,
-          direccion: form.direccion,
-          ubicacion_maps: form.ubicacionMaps,
-          horario_entrega: form.horarioEntrega,
-          notas: form.notas,
-          subtotal,
-          metodo_pago: "payphone",
-        },
-        detalle: construirDetalle(),
-      });
+      const pedido = await registrarPedido("payphone");
+      if (Math.abs(pedido.subtotal - subtotal) > 0.001) {
+        mostrarToast(
+          `El total se actualizó a ${formatPrice(pedido.subtotal)} con los precios vigentes`,
+          "info",
+        );
+      }
       setPedidoCreado(pedido);
     } catch (error) {
       console.error("Error al preparar el pedido:", error);
-      mostrarToast("Hubo un error al preparar tu pedido. Intenta de nuevo.");
+      mostrarToast(
+        mensajeDeError(
+          error,
+          "Hubo un error al preparar tu pedido. Intenta de nuevo.",
+        ),
+      );
     } finally {
       setProcesando(false);
     }
@@ -155,7 +169,7 @@ export default function CheckoutPage() {
     if (!pedidoCreado || !scriptListo) return;
     if (typeof window === "undefined" || !window.PPaymentButtonBox) return;
 
-    const montoCentavos = Math.round(subtotal * 100);
+    const montoCentavos = Math.round(pedidoCreado.subtotal * 100);
 
     // Payphone exige el celular en formato internacional: +593987654321
     // El cliente normalmente lo escribe como 0987654321 (formato local).
@@ -561,7 +575,9 @@ export default function CheckoutPage() {
                 <div className="border-t border-gray-300 pt-4">
                   <div className="flex justify-between text-xl font-light text-gray-900">
                     <span>Total</span>
-                    <span>{formatPrice(subtotal)}</span>
+                    <span>
+                      {formatPrice(pedidoCreado?.subtotal ?? subtotal)}
+                    </span>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
                     No incluye envío (se coordina aparte)
