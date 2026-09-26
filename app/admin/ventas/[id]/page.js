@@ -10,6 +10,7 @@ import {
 } from "@/lib/supabase/ventas";
 import { getCuentaPorCliente } from "@/lib/supabase/cuentas";
 import { getDistribuidoras } from "@/lib/supabase/distribuidoras";
+import { buscarClientes } from "@/lib/supabase/clientes";
 import { supabase } from "@/lib/supabase/client";
 import { formatPrice } from "@/utils/formatters";
 import { descargarVentaPDF } from "@/lib/pdf/venta";
@@ -57,6 +58,12 @@ export default function DetalleVentaPage({ params }) {
     descuento: "0",
   });
   const [detalleEdit, setDetalleEdit] = useState([]);
+  const [fechaOriginal, setFechaOriginal] = useState("");
+  const [clienteEdit, setClienteEdit] = useState(null);
+  const [mostrarBuscadorCliente, setMostrarBuscadorCliente] = useState(false);
+  const [busquedaCliente, setBusquedaCliente] = useState("");
+  const [resultadosCliente, setResultadosCliente] = useState([]);
+  const [buscandoCliente, setBuscandoCliente] = useState(false);
   const [codigoBusqueda, setCodigoBusqueda] = useState("");
   const [resultadosBusqueda, setResultadosBusqueda] = useState([]);
   const [buscando, setBuscando] = useState(false);
@@ -114,8 +121,14 @@ export default function DetalleVentaPage({ params }) {
   };
 
   const handleIniciarEdicion = () => {
+    const fecha = venta.fecha?.slice(0, 10) || "";
+    setFechaOriginal(fecha);
+    setClienteEdit(venta.cliente || null);
+    setMostrarBuscadorCliente(false);
+    setBusquedaCliente("");
+    setResultadosCliente([]);
     setFormEdit({
-      fecha: venta.fecha?.slice(0, 10) || "",
+      fecha,
       notas: venta.notas || "",
       via: venta.via || "",
       id_distribuidora: venta.id_distribuidora || "",
@@ -156,20 +169,62 @@ export default function DetalleVentaPage({ params }) {
   };
 
   const handleAgregarProductoEdit = (producto) => {
-    setDetalleEdit((prev) => [
-      ...prev,
-      {
-        clave: `nuevo-${Date.now()}-${Math.random()}`,
-        id_producto: producto.id,
-        esManual: false,
-        codigo: producto.codigo,
-        nombre: producto.nombre_comercial,
-        precio_unitario: calcularPrecio(producto),
-        cantidad: 1,
-      },
-    ]);
+    setDetalleEdit((prev) => {
+      const existente = prev.find(
+        (item) => !item.esManual && item.id_producto === producto.id,
+      );
+      if (existente) {
+        return prev.map((item) =>
+          item.clave === existente.clave
+            ? { ...item, cantidad: item.cantidad + 1 }
+            : item,
+        );
+      }
+      return [
+        ...prev,
+        {
+          clave: `nuevo-${Date.now()}-${Math.random()}`,
+          id_producto: producto.id,
+          esManual: false,
+          codigo: producto.codigo,
+          nombre: producto.nombre_comercial,
+          precio_unitario: calcularPrecio(producto),
+          cantidad: 1,
+        },
+      ];
+    });
     setResultadosBusqueda([]);
     setCodigoBusqueda("");
+  };
+
+  const handleBuscarClienteEdit = async () => {
+    if (!busquedaCliente.trim()) return;
+    setBuscandoCliente(true);
+    try {
+      setResultadosCliente(await buscarClientes(busquedaCliente.trim()));
+    } catch (error) {
+      console.error("Error al buscar cliente:", error);
+      alert("Error al buscar cliente");
+    } finally {
+      setBuscandoCliente(false);
+    }
+  };
+
+  const handleSeleccionarClienteEdit = (cliente) => {
+    const teniaDistribuidora = !!clienteEdit?.id_distribuidora;
+    setClienteEdit(cliente);
+    if (cliente?.id_distribuidora) {
+      setFormEdit((p) => ({
+        ...p,
+        via: "distribuidora",
+        id_distribuidora: cliente.id_distribuidora,
+      }));
+    } else if (teniaDistribuidora) {
+      setFormEdit((p) => ({ ...p, id_distribuidora: "" }));
+    }
+    setMostrarBuscadorCliente(false);
+    setBusquedaCliente("");
+    setResultadosCliente([]);
   };
 
   const handleAgregarItemManualEdit = () => {
@@ -229,11 +284,21 @@ export default function DetalleVentaPage({ params }) {
     0,
   );
   const descuentoEditNum = parseFloat(formEdit.descuento) || 0;
+  const tieneDistribuidoraCliente = !!clienteEdit?.id_distribuidora;
+  const nombreDistribuidoraCliente =
+    clienteEdit?.distribuidora?.nombre ||
+    distribuidoras.find((d) => d.id === clienteEdit?.id_distribuidora)
+      ?.nombre ||
+    "";
   const totalEdit = Math.max(0, subtotalEdit - descuentoEditNum);
 
   const handleGuardarEdicion = async () => {
     if (detalleEdit.length === 0) {
       alert("La venta debe tener al menos un producto");
+      return;
+    }
+    if (!formEdit.fecha) {
+      alert("La fecha es obligatoria");
       return;
     }
     setGuardandoEdicion(true);
@@ -242,8 +307,8 @@ export default function DetalleVentaPage({ params }) {
         ? editarVentaCredito
         : editarVentaContado;
 
-      const resultado = await funcionEditar(resolvedParams.id, {
-        fecha: formEdit.fecha,
+      const datos = {
+        fecha: formEdit.fecha !== fechaOriginal ? formEdit.fecha : undefined,
         notas: formEdit.notas,
         via: formEdit.via,
         id_distribuidora: formEdit.id_distribuidora || null,
@@ -255,24 +320,34 @@ export default function DetalleVentaPage({ params }) {
           cantidad: item.cantidad,
           precio_unitario: item.precio_unitario,
         })),
-      });
+      };
+      if (!venta.es_credito) datos.id_cliente = clienteEdit?.id || null;
+
+      let resultado = await funcionEditar(resolvedParams.id, datos);
+
+      if (resultado.requiereConfirmacion) {
+        const confirmado = confirm(
+          `Con este cambio el cliente queda con un saldo a favor de ${formatPrice(resultado.saldoFavor)} (pagó más de lo que ahora debe). ¿Guardar de todas formas?`,
+        );
+        if (!confirmado) return;
+        resultado = await funcionEditar(resolvedParams.id, {
+          ...datos,
+          confirmarSaldoFavor: true,
+        });
+      }
 
       if (resultado.avisoComisionPagada) {
         alert(
           "La venta se corrigió, pero la comisión que generó ya estaba marcada como pagada, así que no se tocó. Revísala a mano si hace falta un ajuste.",
         );
       }
-
-      queryClient.invalidateQueries({ queryKey: ["venta", resolvedParams.id] });
-      queryClient.invalidateQueries({ queryKey: ["ventas"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-productos"] });
-      if (venta.es_credito) {
-        queryClient.invalidateQueries({ queryKey: ["cuenta-cliente"] });
-        queryClient.invalidateQueries({ queryKey: ["cuenta-movimientos"] });
-        queryClient.invalidateQueries({ queryKey: ["cuenta-periodos"] });
-        queryClient.invalidateQueries({ queryKey: ["cobros-mes"] });
-        queryClient.invalidateQueries({ queryKey: ["cuentas"] });
+      if (resultado.avisoComisionNoGenerada) {
+        alert(
+          "La venta se corrigió, pero no se pudo generar la comisión para la distribuidora del nuevo cliente. Revísala a mano.",
+        );
       }
+
+      queryClient.invalidateQueries();
       setEditando(false);
     } catch (error) {
       console.error("Error al guardar la edición:", error);
@@ -522,6 +597,114 @@ export default function DetalleVentaPage({ params }) {
           {/* MODO EDICIÓN */}
           <div className="bg-white border border-gray-200 p-6 mb-6">
             <h2 className="text-lg font-medium text-gray-900 uppercase tracking-wider mb-4">
+              Cliente
+            </h2>
+            {venta.es_credito ? (
+              <div>
+                <p className="font-medium text-gray-900">
+                  {clienteEdit?.nombre || "Sin cliente"}
+                </p>
+                {clienteEdit?.telefono && (
+                  <p className="text-sm text-gray-600">
+                    {clienteEdit.telefono}
+                  </p>
+                )}
+                <p className="text-xs text-gray-500 mt-2">
+                  En una venta a crédito el cliente no se puede cambiar, porque
+                  la deuda está registrada en su cuenta.
+                </p>
+              </div>
+            ) : !mostrarBuscadorCliente ? (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium text-gray-900">
+                    {clienteEdit?.nombre || "Sin cliente"}
+                  </p>
+                  {clienteEdit?.telefono && (
+                    <p className="text-sm text-gray-600">
+                      {clienteEdit.telefono}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setMostrarBuscadorCliente(true)}
+                    className="text-sm text-gray-700 hover:text-gray-900 underline"
+                  >
+                    {clienteEdit ? "Cambiar cliente" : "Asignar cliente"}
+                  </button>
+                  {clienteEdit && (
+                    <button
+                      onClick={() => handleSeleccionarClienteEdit(null)}
+                      className="text-sm text-red-600 hover:text-red-900 underline"
+                    >
+                      Quitar cliente
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={busquedaCliente}
+                    onChange={(e) => setBusquedaCliente(e.target.value)}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && handleBuscarClienteEdit()
+                    }
+                    placeholder="Buscar por nombre o teléfono..."
+                    className="flex-1 px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                  />
+                  <button
+                    onClick={handleBuscarClienteEdit}
+                    disabled={buscandoCliente}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 text-sm hover:bg-gray-50"
+                  >
+                    {buscandoCliente ? "Buscando..." : "Buscar"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMostrarBuscadorCliente(false);
+                      setBusquedaCliente("");
+                      setResultadosCliente([]);
+                    }}
+                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+                {resultadosCliente.length > 0 && (
+                  <div className="border border-gray-200 max-h-56 overflow-y-auto">
+                    {resultadosCliente.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => handleSeleccionarClienteEdit(c)}
+                        className="w-full flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 text-left"
+                      >
+                        <div>
+                          <p className="text-sm text-gray-900">{c.nombre}</p>
+                          {c.telefono && (
+                            <p className="text-xs text-gray-500">
+                              {c.telefono}
+                            </p>
+                          )}
+                        </div>
+                        {c.distribuidora?.nombre && (
+                          <span className="text-xs text-gray-500">
+                            {c.distribuidora.nombre}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white border border-gray-200 p-6 mb-6">
+            <h2 className="text-lg font-medium text-gray-900 uppercase tracking-wider mb-4">
               Datos Generales
             </h2>
             <div className="grid sm:grid-cols-2 gap-4">
@@ -538,47 +721,80 @@ export default function DetalleVentaPage({ params }) {
                   className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
                 />
               </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">
-                  Vía de venta
-                </label>
-                <select
-                  value={formEdit.via}
-                  onChange={(e) =>
-                    setFormEdit((p) => ({ ...p, via: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
-                >
-                  {VIAS_VENTA.map((v) => (
-                    <option key={v.value} value={v.value}>
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {formEdit.via === "distribuidora" && (
+              {tieneDistribuidoraCliente ? (
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">
-                    Distribuidora
+                    Vía de venta
                   </label>
-                  <select
-                    value={formEdit.id_distribuidora}
-                    onChange={(e) =>
-                      setFormEdit((p) => ({
-                        ...p,
-                        id_distribuidora: e.target.value,
-                      }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
-                  >
-                    <option value="">-</option>
-                    {distribuidoras.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.nombre}
-                      </option>
-                    ))}
-                  </select>
+                  <p className="px-3 py-2 border border-gray-200 bg-gray-50 text-gray-700">
+                    Distribuidora — {nombreDistribuidoraCliente}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Viene del cliente.
+                    {!venta.es_credito &&
+                      " La comisión es para esta distribuidora."}
+                  </p>
                 </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">
+                      Vía de venta
+                    </label>
+                    <select
+                      value={formEdit.via}
+                      onChange={(e) =>
+                        setFormEdit((p) => ({
+                          ...p,
+                          via: e.target.value,
+                          id_distribuidora:
+                            e.target.value === "distribuidora"
+                              ? p.id_distribuidora
+                              : "",
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                    >
+                      {VIAS_VENTA.map((v) => (
+                        <option key={v.value} value={v.value}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {formEdit.via === "distribuidora" && (
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">
+                        Distribuidora
+                      </label>
+                      <select
+                        value={formEdit.id_distribuidora}
+                        onChange={(e) =>
+                          setFormEdit((p) => ({
+                            ...p,
+                            id_distribuidora: e.target.value,
+                          }))
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                      >
+                        <option value="">-</option>
+                        {distribuidoras.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.nombre}
+                          </option>
+                        ))}
+                      </select>
+                      {!venta.es_credito && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Esta venta no genera comisión porque{" "}
+                          {clienteEdit
+                            ? "el cliente no tiene distribuidora asignada."
+                            : "no tiene cliente."}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
               <div>
                 <label className="block text-sm text-gray-600 mb-1">

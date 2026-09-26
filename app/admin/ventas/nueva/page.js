@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
@@ -163,6 +163,19 @@ export default function NuevaVentaPage() {
       cancelado = true;
     };
   }, [clienteSeleccionado?.id]);
+
+  // La venta refleja la distribuidora del cliente, si tiene una.
+  const distribuidoraClienteAnterior = useRef(null);
+  useEffect(() => {
+    const idDistribuidora = clienteSeleccionado?.id_distribuidora || null;
+    if (idDistribuidora) {
+      setVia("distribuidora");
+      setDistribuidoraId(idDistribuidora);
+    } else if (distribuidoraClienteAnterior.current) {
+      setDistribuidoraId("");
+    }
+    distribuidoraClienteAnterior.current = idDistribuidora;
+  }, [clienteSeleccionado?.id, clienteSeleccionado?.id_distribuidora]);
 
   // Precarga cuando la venta viene de un préstamo (sacar para vender)
   useEffect(() => {
@@ -349,11 +362,16 @@ export default function NuevaVentaPage() {
   const descuentoNum = parseFloat(descuento) || 0;
   const total = Math.max(0, subtotal - descuentoNum);
 
-  const distribuidoraSeleccionada = distribuidoras.find(
-    (d) => d.id === distribuidoraId,
+  const tieneDistribuidoraCliente = !!clienteSeleccionado?.id_distribuidora;
+  const distribuidoraCliente = distribuidoras.find(
+    (d) => d.id === clienteSeleccionado?.id_distribuidora,
   );
-  const comisionMonto = distribuidoraSeleccionada
-    ? (total * distribuidoraSeleccionada.porcentaje_comision) / 100
+  const nombreDistribuidoraCliente =
+    distribuidoraCliente?.nombre ||
+    clienteSeleccionado?.distribuidora?.nombre ||
+    "";
+  const comisionMonto = distribuidoraCliente
+    ? (total * distribuidoraCliente.porcentaje_comision) / 100
     : 0;
 
   const mesesPlazo =
@@ -1050,55 +1068,81 @@ export default function NuevaVentaPage() {
           5. Vía de Venta
         </h2>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-          {VIAS_VENTA.map((v) => (
-            <button
-              key={v.value}
-              onClick={() => {
-                setVia(v.value);
-                if (v.value !== "distribuidora") setDistribuidoraId("");
-              }}
-              className={`py-3 px-4 border text-sm uppercase tracking-wider transition-colors ${
-                via === v.value
-                  ? "bg-gray-900 text-white border-gray-900"
-                  : "bg-white text-gray-700 border-gray-300 hover:border-gray-900"
-              }`}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
-
-        {via === "distribuidora" && (
+        {tieneDistribuidoraCliente ? (
           <div className="max-w-sm space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Distribuidora
-              </label>
-              <select
-                value={distribuidoraId}
-                onChange={(e) => setDistribuidoraId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
-              >
-                <option value="">Seleccionar distribuidora</option>
-                {distribuidoras.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.nombre} ({d.porcentaje_comision}%)
-                  </option>
-                ))}
-              </select>
+            <div className="bg-gray-50 p-3 border border-gray-200">
+              <p className="text-sm text-gray-600">
+                Distribuidora:
+                <span className="font-medium text-gray-900 ml-2">
+                  {nombreDistribuidoraCliente}
+                </span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Viene del cliente seleccionado.
+              </p>
             </div>
             {comisionMonto > 0 && (
               <div className="bg-gray-50 p-3 border border-gray-200">
                 <p className="text-sm text-gray-600">
-                  Comisión ({distribuidoraSeleccionada?.porcentaje_comision}%):
+                  Comisión ({distribuidoraCliente?.porcentaje_comision}%):
                   <span className="font-medium text-gray-900 ml-2">
-                    {formatPrice(comisionMonto)}
+                    {esCredito
+                      ? "se genera con cada pago del cliente"
+                      : formatPrice(comisionMonto)}
                   </span>
                 </p>
               </div>
             )}
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+              {VIAS_VENTA.map((v) => (
+                <button
+                  key={v.value}
+                  onClick={() => {
+                    setVia(v.value);
+                    if (v.value !== "distribuidora") setDistribuidoraId("");
+                  }}
+                  className={`py-3 px-4 border text-sm uppercase tracking-wider transition-colors ${
+                    via === v.value
+                      ? "bg-gray-900 text-white border-gray-900"
+                      : "bg-white text-gray-700 border-gray-300 hover:border-gray-900"
+                  }`}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+
+            {via === "distribuidora" && (
+              <div className="max-w-sm space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Distribuidora
+                  </label>
+                  <select
+                    value={distribuidoraId}
+                    onChange={(e) => setDistribuidoraId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                  >
+                    <option value="">Seleccionar distribuidora</option>
+                    {distribuidoras.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.nombre} ({d.porcentaje_comision}%)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Esta venta no genera comisión porque{" "}
+                  {clienteSeleccionado
+                    ? "el cliente no tiene distribuidora asignada."
+                    : "no tiene cliente."}
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
 
