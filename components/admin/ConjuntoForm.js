@@ -62,6 +62,14 @@ export default function ConjuntoForm({ conjunto = null }) {
     });
   };
 
+  const handleImageRemove = () => {
+    setFormData((prev) => ({
+      ...prev,
+      imagen_url: "",
+      imagen_public_id: "",
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -152,7 +160,9 @@ export default function ConjuntoForm({ conjunto = null }) {
         </p>
         <ImageUploader
           currentImage={formData.imagen_url}
+          currentPublicId={formData.imagen_public_id}
           onImageUpload={handleImageUpload}
+          onImageRemove={handleImageRemove}
           productCode={formData.nombre}
           requireCode={false}
         />

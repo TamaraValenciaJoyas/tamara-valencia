@@ -227,11 +227,18 @@ export default function CarritoPage() {
                     </div>
                   </div>
 
+                  <Link
+                    href="/carrito/checkout"
+                    className="block w-full px-6 py-4 bg-gray-900 text-white text-center font-light tracking-widest uppercase text-sm hover:bg-gray-800 transition-colors mb-4"
+                  >
+                    Proceder con la Compra
+                  </Link>
+
                   <button
                     onClick={handleWhatsAppCheckout}
-                    className="w-full px-6 py-4 bg-gray-900 text-white text-center font-light tracking-widest uppercase text-sm hover:bg-gray-800 transition-colors mb-4"
+                    className="w-full px-6 py-3 border border-gray-300 text-gray-700 text-center font-light tracking-widest uppercase text-xs hover:bg-gray-50 transition-colors mb-4"
                   >
-                    Enviar Pedido por WhatsApp
+                    O Consultar por WhatsApp
                   </button>
 
                   <Link

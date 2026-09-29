@@ -8,8 +8,11 @@ import {
   devolverTodo,
   agregarJoyaAPrestamo,
   quitarJoyaDePrestamo,
+  editarPrestamo,
+  eliminarPrestamo,
 } from "@/lib/supabase/prestamos";
 import { supabase } from "@/lib/supabase/client";
+import { getDistribuidoras } from "@/lib/supabase/distribuidoras";
 import { formatPrice } from "@/utils/formatters";
 import { descargarPrestamoPDF } from "@/lib/pdf/prestamo";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
@@ -28,6 +31,22 @@ export default function DetallePrestamoPage({ params }) {
   const [codigoBusqueda, setCodigoBusqueda] = useState("");
   const [resultadosBusqueda, setResultadosBusqueda] = useState([]);
   const [busquedaHecha, setBusquedaHecha] = useState(false);
+
+  // Editar datos generales del préstamo
+  const [editandoPrestamo, setEditandoPrestamo] = useState(false);
+  const [formEditarPrestamo, setFormEditarPrestamo] = useState({
+    fecha_prestamo: "",
+    id_distribuidora: "",
+    notas: "",
+  });
+  const [guardandoPrestamo, setGuardandoPrestamo] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+
+  const { data: distribuidoras = [] } = useQuery({
+    queryKey: ["distribuidoras-activas"],
+    queryFn: getDistribuidoras,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { data: prestamo, isLoading } = useQuery({
     queryKey: ["prestamo", resolvedParams.id],
@@ -274,6 +293,50 @@ export default function DetallePrestamoPage({ params }) {
     }
   };
 
+  const handleAbrirEditarPrestamo = () => {
+    setFormEditarPrestamo({
+      fecha_prestamo: prestamo.fecha_prestamo?.slice(0, 10) || "",
+      id_distribuidora: prestamo.id_distribuidora || "",
+      notas: prestamo.notas || "",
+    });
+    setEditandoPrestamo(true);
+  };
+
+  const handleGuardarEdicionPrestamo = async () => {
+    setGuardandoPrestamo(true);
+    try {
+      await editarPrestamo(prestamo.id, formEditarPrestamo);
+      refrescarPrestamo();
+      queryClient.invalidateQueries({ queryKey: ["prestamos"] });
+      setEditandoPrestamo(false);
+    } catch (error) {
+      console.error("Error al editar el préstamo:", error);
+      alert("Error al editar el préstamo: " + error.message);
+    } finally {
+      setGuardandoPrestamo(false);
+    }
+  };
+
+  const handleEliminarPrestamo = async () => {
+    if (
+      !confirm(
+        "¿Eliminar este préstamo por completo? Esto borra el registro entero, incluyendo todas las joyas que tuvo. No se puede deshacer.",
+      )
+    )
+      return;
+
+    setEliminando(true);
+    try {
+      await eliminarPrestamo(prestamo.id);
+      queryClient.invalidateQueries({ queryKey: ["prestamos"] });
+      router.push("/admin/prestamos");
+    } catch (error) {
+      console.error("Error al eliminar el préstamo:", error);
+      alert("Error al eliminar el préstamo: " + error.message);
+      setEliminando(false);
+    }
+  };
+
   if (isLoading) return <LoadingSpinner />;
   if (!prestamo)
     return (
@@ -310,6 +373,21 @@ export default function DetallePrestamoPage({ params }) {
               className="text-sm text-gray-700 hover:text-gray-900 underline"
             >
               + Agregar joya olvidada
+            </button>
+          )}
+          <button
+            onClick={handleAbrirEditarPrestamo}
+            className="text-sm text-gray-700 hover:text-gray-900 underline"
+          >
+            Editar
+          </button>
+          {prestamo.estado === "finalizado" && (
+            <button
+              onClick={handleEliminarPrestamo}
+              disabled={eliminando}
+              className="text-sm text-red-600 hover:text-red-900 underline disabled:opacity-50"
+            >
+              {eliminando ? "Eliminando..." : "Eliminar"}
             </button>
           )}
           <button
@@ -592,6 +670,86 @@ export default function DetallePrestamoPage({ params }) {
             >
               Cerrar
             </button>
+          </div>
+        </div>
+      )}
+
+      {editandoPrestamo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white max-w-sm w-full p-6">
+            <h3 className="text-xl font-light text-gray-900 mb-6">
+              Editar Préstamo
+            </h3>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fecha del préstamo
+                </label>
+                <input
+                  type="date"
+                  value={formEditarPrestamo.fecha_prestamo}
+                  onChange={(e) =>
+                    setFormEditarPrestamo((p) => ({
+                      ...p,
+                      fecha_prestamo: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Distribuidora
+                </label>
+                <select
+                  value={formEditarPrestamo.id_distribuidora}
+                  onChange={(e) =>
+                    setFormEditarPrestamo((p) => ({
+                      ...p,
+                      id_distribuidora: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                >
+                  {distribuidoras.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notas
+                </label>
+                <textarea
+                  value={formEditarPrestamo.notas}
+                  onChange={(e) =>
+                    setFormEditarPrestamo((p) => ({
+                      ...p,
+                      notas: e.target.value,
+                    }))
+                  }
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleGuardarEdicionPrestamo}
+                disabled={guardandoPrestamo}
+                className="flex-1 py-3 bg-gray-900 text-white text-sm uppercase tracking-wider hover:bg-gray-800 disabled:bg-gray-400"
+              >
+                {guardandoPrestamo ? "Guardando..." : "Guardar"}
+              </button>
+              <button
+                onClick={() => setEditandoPrestamo(false)}
+                className="px-6 py-3 border border-gray-300 text-gray-700 text-sm uppercase tracking-wider hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

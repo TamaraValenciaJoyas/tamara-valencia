@@ -1,18 +1,40 @@
 "use client";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { getPrestamos } from "@/lib/supabase/prestamos";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getPrestamos, eliminarPrestamo } from "@/lib/supabase/prestamos";
 import Link from "next/link";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 
 export default function PrestamosPage() {
+  const queryClient = useQueryClient();
   const [filtroEstado, setFiltroEstado] = useState("activo");
+  const [eliminandoId, setEliminandoId] = useState(null);
 
   const { data: prestamos = [], isLoading } = useQuery({
     queryKey: ["prestamos", filtroEstado],
-    queryFn: () => getPrestamos(filtroEstado || undefined),
+    queryFn: () => getPrestamos(filtroEstado),
     staleTime: 2 * 60 * 1000,
   });
+
+  const handleEliminar = async (prestamo) => {
+    if (
+      !confirm(
+        `¿Eliminar el préstamo de ${prestamo.distribuidora?.nombre}? No se puede deshacer.`,
+      )
+    )
+      return;
+
+    setEliminandoId(prestamo.id);
+    try {
+      await eliminarPrestamo(prestamo.id);
+      queryClient.invalidateQueries({ queryKey: ["prestamos"] });
+    } catch (error) {
+      console.error("Error al eliminar el préstamo:", error);
+      alert("Error al eliminar el préstamo: " + error.message);
+    } finally {
+      setEliminandoId(null);
+    }
+  };
 
   const formatFecha = (fecha) => {
     if (!fecha) return "-";
@@ -128,12 +150,25 @@ export default function PrestamosPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4 text-sm">
-                  <Link
-                    href={`/admin/prestamos/${prestamo.id}`}
-                    className="text-blue-600 hover:text-blue-900"
-                  >
-                    Ver detalle
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href={`/admin/prestamos/${prestamo.id}`}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      Ver detalle
+                    </Link>
+                    {prestamo.estado === "finalizado" && (
+                      <button
+                        onClick={() => handleEliminar(prestamo)}
+                        disabled={eliminandoId === prestamo.id}
+                        className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                      >
+                        {eliminandoId === prestamo.id
+                          ? "Eliminando..."
+                          : "Eliminar"}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

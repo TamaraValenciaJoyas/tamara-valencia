@@ -8,15 +8,19 @@ import {
   getHistorialCuotas,
   abrirCuenta,
   registrarPago,
+  editarFechaPago,
+  editarMontoPago,
   ajustarCuota,
   ajustarPeriodo,
   agregarMovimientoManual,
+  editarMovimientoManual,
   generarPeriodosPendientes,
   recalcularSaldos,
   calcularSemaforo,
   hoyStr,
 } from "@/lib/supabase/cuentas";
 import { descargarEstadoCuenta } from "@/lib/pdf/estadoCuenta";
+import { getDescuentosDeVentas } from "@/lib/supabase/ventas";
 import { formatPrice } from "@/utils/formatters";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 
@@ -75,6 +79,17 @@ export default function CuentaCliente({ cliente }) {
     fecha: hoyStr(),
     notas: "",
   });
+  const [editandoFechaPago, setEditandoFechaPago] = useState(null);
+  const [nuevaFechaPago, setNuevaFechaPago] = useState("");
+  const [nuevoMontoPago, setNuevoMontoPago] = useState("");
+  const [guardandoFechaPago, setGuardandoFechaPago] = useState(false);
+  const [editandoMovManual, setEditandoMovManual] = useState(null);
+  const [formEditarMov, setFormEditarMov] = useState({
+    fecha: "",
+    concepto: "",
+    monto: "",
+  });
+  const [guardandoMovManual, setGuardandoMovManual] = useState(false);
   const [formCuota, setFormCuota] = useState({ nueva: "", notas: "" });
   const [formMov, setFormMov] = useState({
     tipo: "cargo",
@@ -139,6 +154,69 @@ export default function CuentaCliente({ cliente }) {
     queryClient.invalidateQueries({ queryKey: ["cuenta-cuotas"] });
     queryClient.invalidateQueries({ queryKey: ["cobros-mes"] });
     queryClient.invalidateQueries({ queryKey: ["cuentas"] });
+  };
+
+  const handleGuardarFechaPago = async () => {
+    if (!nuevaFechaPago || !nuevoMontoPago) {
+      alert("Completa la fecha y el monto");
+      return;
+    }
+    setGuardandoFechaPago(true);
+    try {
+      const fechaCambio = nuevaFechaPago !== editandoFechaPago.fecha;
+      const montoCambio =
+        parseFloat(nuevoMontoPago) !== parseFloat(editandoFechaPago.monto);
+
+      if (fechaCambio) {
+        await editarFechaPago(editandoFechaPago.id, nuevaFechaPago);
+      }
+
+      if (montoCambio) {
+        const resultado = await editarMontoPago(
+          editandoFechaPago.id,
+          nuevoMontoPago,
+        );
+        if (resultado.avisoComisionPagada) {
+          alert(
+            "El pago se corrigió, pero la comisión que generó ya estaba marcada como pagada, así que no se tocó. Revísala a mano si hace falta un ajuste.",
+          );
+        }
+      }
+
+      refrescar();
+      setEditandoFechaPago(null);
+    } catch (error) {
+      console.error("Error al corregir el pago:", error);
+      alert("Error al corregir el pago: " + error.message);
+    } finally {
+      setGuardandoFechaPago(false);
+    }
+  };
+
+  const handleGuardarMovManual = async () => {
+    if (
+      !formEditarMov.fecha ||
+      !formEditarMov.concepto.trim() ||
+      !formEditarMov.monto
+    ) {
+      alert("Completa todos los campos");
+      return;
+    }
+    setGuardandoMovManual(true);
+    try {
+      await editarMovimientoManual(editandoMovManual.id, {
+        fecha: formEditarMov.fecha,
+        concepto: formEditarMov.concepto,
+        monto: formEditarMov.monto,
+      });
+      refrescar();
+      setEditandoMovManual(null);
+    } catch (error) {
+      console.error("Error al editar el movimiento:", error);
+      alert("Error al editar el movimiento: " + error.message);
+    } finally {
+      setGuardandoMovManual(false);
+    }
   };
 
   const formatFecha = (fecha) => {
@@ -272,7 +350,23 @@ export default function CuentaCliente({ cliente }) {
 
   const handleDescargarPDF = async () => {
     try {
-      await descargarEstadoCuenta({ cliente, cuenta, movimientos });
+      const idsVentas = movimientos
+        .filter((m) => m.tipo === "cargo" && m.id_venta)
+        .map((m) => m.id_venta);
+      const descuentos = await getDescuentosDeVentas(idsVentas);
+      const movimientosConDescuento = movimientos.map((m) =>
+        descuentos[m.id_venta]
+          ? {
+              ...m,
+              concepto: `${m.concepto} (descuento ${formatPrice(descuentos[m.id_venta])})`,
+            }
+          : m,
+      );
+      await descargarEstadoCuenta({
+        cliente,
+        cuenta,
+        movimientos: movimientosConDescuento,
+      });
     } catch (error) {
       console.error(error);
       alert(
@@ -616,7 +710,67 @@ export default function CuentaCliente({ cliente }) {
                   <tr key={mov.id} className="hover:bg-gray-50">
                     <td className="px-4 py-2 text-gray-500">{index + 1}</td>
                     <td className="px-4 py-2 text-gray-600">
-                      {formatFecha(mov.fecha)}
+                      <div className="flex items-center gap-2">
+                        {formatFecha(mov.fecha)}
+                        {mov.tipo === "abono" &&
+                          mov.concepto === "Pago recibido" && (
+                            <button
+                              onClick={() => {
+                                setEditandoFechaPago(mov);
+                                setNuevaFechaPago(mov.fecha);
+                                setNuevoMontoPago(mov.monto.toString());
+                              }}
+                              title="Editar este pago"
+                              className="text-gray-400 hover:text-gray-900"
+                            >
+                              <svg
+                                className="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
+                              </svg>
+                            </button>
+                          )}
+                        {!mov.id_venta &&
+                          !(
+                            mov.tipo === "abono" &&
+                            mov.concepto === "Pago recibido"
+                          ) && (
+                            <button
+                              onClick={() => {
+                                setEditandoMovManual(mov);
+                                setFormEditarMov({
+                                  fecha: mov.fecha,
+                                  concepto: mov.concepto,
+                                  monto: mov.monto.toString(),
+                                });
+                              }}
+                              title="Editar este movimiento"
+                              className="text-gray-400 hover:text-gray-900"
+                            >
+                              <svg
+                                className="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
+                              </svg>
+                            </button>
+                          )}
+                      </div>
                     </td>
                     <td className="px-4 py-2">
                       <span className={tipo.cls}>{mov.concepto}</span>
@@ -1028,6 +1182,137 @@ export default function CuentaCliente({ cliente }) {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {editandoFechaPago && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white max-w-sm w-full p-6">
+            <h3 className="text-xl font-light text-gray-900 mb-2">
+              Editar Pago
+            </h3>
+            <p className="text-sm text-gray-500 mb-6">
+              {editandoFechaPago.concepto}
+            </p>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fecha
+                </label>
+                <input
+                  type="date"
+                  value={nuevaFechaPago}
+                  onChange={(e) => setNuevaFechaPago(e.target.value)}
+                  autoFocus
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Monto
+                </label>
+                <input
+                  type="number"
+                  value={nuevoMontoPago}
+                  onChange={(e) =>
+                    setNuevoMontoPago(limitarDecimales(e.target.value))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Si cambias el monto, se vuelve a calcular a qué meses queda
+                  aplicado este pago (junto con los demás pagos de la cuenta).
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleGuardarFechaPago}
+                disabled={guardandoFechaPago}
+                className="flex-1 py-3 bg-gray-900 text-white text-sm uppercase tracking-wider hover:bg-gray-800 disabled:bg-gray-400"
+              >
+                {guardandoFechaPago ? "Guardando..." : "Guardar"}
+              </button>
+              <button
+                onClick={() => setEditandoFechaPago(null)}
+                className="px-6 py-3 border border-gray-300 text-gray-700 text-sm uppercase tracking-wider hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editandoMovManual && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white max-w-sm w-full p-6">
+            <h3 className="text-xl font-light text-gray-900 mb-6">
+              Editar Movimiento
+            </h3>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fecha
+                </label>
+                <input
+                  type="date"
+                  value={formEditarMov.fecha}
+                  onChange={(e) =>
+                    setFormEditarMov((p) => ({ ...p, fecha: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Concepto
+                </label>
+                <input
+                  type="text"
+                  value={formEditarMov.concepto}
+                  onChange={(e) =>
+                    setFormEditarMov((p) => ({
+                      ...p,
+                      concepto: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Monto
+                </label>
+                <input
+                  type="number"
+                  value={formEditarMov.monto}
+                  onChange={(e) =>
+                    setFormEditarMov((p) => ({
+                      ...p,
+                      monto: limitarDecimales(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleGuardarMovManual}
+                disabled={guardandoMovManual}
+                className="flex-1 py-3 bg-gray-900 text-white text-sm uppercase tracking-wider hover:bg-gray-800 disabled:bg-gray-400"
+              >
+                {guardandoMovManual ? "Guardando..." : "Guardar"}
+              </button>
+              <button
+                onClick={() => setEditandoMovManual(null)}
+                className="px-6 py-3 border border-gray-300 text-gray-700 text-sm uppercase tracking-wider hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

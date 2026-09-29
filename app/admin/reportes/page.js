@@ -36,6 +36,7 @@ const COLORES_VIA = {
   distribuidora: "#9ca3af",
   tvcj: "#b0b5bd",
   cuenta_gerencia: "#d1d5db",
+  web: "#0ea5e9",
 };
 
 const VIAS_LABEL = {
@@ -45,6 +46,7 @@ const VIAS_LABEL = {
   distribuidora: "Distribuidora",
   tvcj: "TVCJ",
   cuenta_gerencia: "Cuenta Gerencia",
+  web: "Página Web",
 };
 
 const COLORES_TIPO = [
