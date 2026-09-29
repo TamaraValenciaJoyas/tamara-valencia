@@ -20,6 +20,7 @@ import {
   hoyStr,
 } from "@/lib/supabase/cuentas";
 import { descargarEstadoCuenta } from "@/lib/pdf/estadoCuenta";
+import { getDescuentosDeVentas } from "@/lib/supabase/ventas";
 import { formatPrice } from "@/utils/formatters";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 
@@ -349,7 +350,23 @@ export default function CuentaCliente({ cliente }) {
 
   const handleDescargarPDF = async () => {
     try {
-      await descargarEstadoCuenta({ cliente, cuenta, movimientos });
+      const idsVentas = movimientos
+        .filter((m) => m.tipo === "cargo" && m.id_venta)
+        .map((m) => m.id_venta);
+      const descuentos = await getDescuentosDeVentas(idsVentas);
+      const movimientosConDescuento = movimientos.map((m) =>
+        descuentos[m.id_venta]
+          ? {
+              ...m,
+              concepto: `${m.concepto} (descuento ${formatPrice(descuentos[m.id_venta])})`,
+            }
+          : m,
+      );
+      await descargarEstadoCuenta({
+        cliente,
+        cuenta,
+        movimientos: movimientosConDescuento,
+      });
     } catch (error) {
       console.error(error);
       alert(

@@ -92,6 +92,7 @@ export async function POST(request) {
         continue;
       }
       detalle.push({
+        orden: detalle.length,
         id_producto: id,
         cantidad: cantidades[id],
         precio_unitario: precio,
