@@ -17,6 +17,15 @@ const limitarDecimales = (valor) => {
 
 export default function ProductForm({ producto = null }) {
   const router = useRouter();
+
+  // Vuelve a la lista con los filtros que tenía, aunque el formulario se
+  // haya abierto en una pestaña nueva (sin historial para "volver atrás").
+  const volverALista = () => {
+    const volver = new URLSearchParams(window.location.search).get("volver");
+    router.replace(
+      volver?.startsWith("/admin/productos") ? volver : "/admin/productos",
+    );
+  };
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [conjuntos, setConjuntos] = useState([]);
@@ -227,7 +236,7 @@ export default function ProductForm({ producto = null }) {
 
       queryClient.invalidateQueries({ queryKey: ["admin-productos"] });
       localStorage.removeItem(storageKey);
-      router.back();
+      volverALista();
     } catch (error) {
       console.error("Error al guardar producto:", error);
       alert("Error al guardar el producto: " + error.message);
@@ -510,7 +519,7 @@ export default function ProductForm({ producto = null }) {
       <div className="flex justify-end space-x-4">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={volverALista}
           className="px-6 py-3 border border-gray-300 text-gray-700 text-sm uppercase tracking-wider hover:bg-gray-50 transition-colors"
         >
           Cancelar
