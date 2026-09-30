@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
@@ -29,32 +29,49 @@ export default function ProductosAdminPage() {
     return "";
   };
 
-  const initialFiltros = {
-    tipo: searchParams.get("tipo") || "",
-    categoria: searchParams.get("categoria") || "",
-    material: searchParams.get("material") || "",
-    factorId: searchParams.get("factorId") || "",
-    conjuntoId: searchParams.get("conjuntoId") || "",
-    precioMin: searchParams.get("precioMin") || "",
-    precioMax: searchParams.get("precioMax") || "",
-    codigo: searchParams.get("codigo") || "",
-    sinImagen: parseBool(searchParams.get("sinImagen")),
-    sinStock: parseBool(searchParams.get("sinStock")),
-    soloInactivos: parseBool(searchParams.get("soloInactivos")),
-  };
+  const leerFiltros = (params) => ({
+    tipo: params.get("tipo") || "",
+    categoria: params.get("categoria") || "",
+    material: params.get("material") || "",
+    factorId: params.get("factorId") || "",
+    conjuntoId: params.get("conjuntoId") || "",
+    precioMin: params.get("precioMin") || "",
+    precioMax: params.get("precioMax") || "",
+    codigo: params.get("codigo") || "",
+    sinImagen: parseBool(params.get("sinImagen")),
+    sinStock: parseBool(params.get("sinStock")),
+    soloInactivos: parseBool(params.get("soloInactivos")),
+  });
+
+  const initialFiltros = leerFiltros(searchParams);
 
   const [filtros, setFiltros] = useState(initialFiltros);
   const [filtrosActivos, setFiltrosActivos] = useState(() => initialFiltros);
 
+  // URLs que esta misma pantalla escribió. Si la URL cambia a una de
+  // ellas, no se relee (evita pisar lo que se está escribiendo). Si cambia
+  // a cualquier otra (menú, botón atrás), la pantalla se sincroniza.
+  const urlsPropias = useRef([]);
+  const queryActual = searchParams.toString();
+  const urlLista = `/admin/productos${queryActual ? `?${queryActual}` : ""}`;
+
+  useEffect(() => {
+    const indice = urlsPropias.current.indexOf(queryActual);
+    if (indice !== -1) {
+      urlsPropias.current = urlsPropias.current.slice(indice + 1);
+      return;
+    }
+    urlsPropias.current = [];
+    const desdeUrl = leerFiltros(new URLSearchParams(queryActual));
+    setFiltros(desdeUrl);
+    setFiltrosActivos(desdeUrl);
+    setHasSearched(queryActual.length > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryActual]);
+
   useEffect(() => {
     fetchConjuntos();
     fetchFactores();
-  }, []);
-
-  useEffect(() => {
-    const tieneParametros = Array.from(searchParams.keys()).length > 0;
-    if (tieneParametros) setHasSearched(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -74,6 +91,7 @@ export default function ProductosAdminPage() {
         }
       });
       const queryString = params.toString();
+      urlsPropias.current.push(queryString);
       router.replace(
         queryString ? `/admin/productos?${queryString}` : "/admin/productos",
         { scroll: false },
@@ -223,6 +241,7 @@ export default function ProductosAdminPage() {
     setFiltros(filtrosVacios);
     setFiltrosActivos(filtrosVacios);
     setHasSearched(false);
+    urlsPropias.current.push("");
     router.replace("/admin/productos", { scroll: false });
   };
 
@@ -310,7 +329,7 @@ export default function ProductosAdminPage() {
           Productos
         </h1>
         <Link
-          href="/admin/productos/nuevo"
+          href={`/admin/productos/nuevo?volver=${encodeURIComponent(urlLista)}`}
           className="px-6 py-3 bg-gray-900 text-white text-sm uppercase tracking-wider hover:bg-gray-800 transition-colors"
         >
           Nuevo Producto
@@ -769,7 +788,7 @@ export default function ProductosAdminPage() {
                       </td>
                       <td className="px-6 py-4 text-sm space-x-2">
                         <Link
-                          href={`/admin/productos/${producto.id}/editar`}
+                          href={`/admin/productos/${producto.id}/editar?volver=${encodeURIComponent(urlLista)}`}
                           className="text-blue-600 hover:text-blue-900"
                         >
                           Editar
