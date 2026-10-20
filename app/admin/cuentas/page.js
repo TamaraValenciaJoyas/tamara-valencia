@@ -236,126 +236,130 @@ export default function CuentasPage() {
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  #
-                </th>
-                <th className="px-4 py-3 w-8"></th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Cliente
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Vence
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Esperado
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Pagado
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Falta
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Estado
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Saldo total
-                </th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {cobrosOrdenados.map((periodo, index) => {
-                const sem = calcularSemaforo(periodo);
-                const estilo = SEMAFORO[sem] || SEMAFORO.verde;
-                const esperado = parseFloat(periodo.monto_esperado) || 0;
-                const pagado = parseFloat(periodo.monto_pagado) || 0;
-                const falta = Math.max(0, esperado - pagado);
-                const ajustado = ["aplazado", "diferido", "gracia"].includes(
-                  periodo.estado,
-                );
+          <div className="tabla-scroll">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    #
+                  </th>
+                  <th className="px-4 py-3 w-8"></th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Cliente
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Vence
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Esperado
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Pagado
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Falta
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Estado
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Saldo total
+                  </th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {cobrosOrdenados.map((periodo, index) => {
+                  const sem = calcularSemaforo(periodo);
+                  const estilo = SEMAFORO[sem] || SEMAFORO.verde;
+                  const esperado = parseFloat(periodo.monto_esperado) || 0;
+                  const pagado = parseFloat(periodo.monto_pagado) || 0;
+                  const falta = Math.max(0, esperado - pagado);
+                  const ajustado = ["aplazado", "diferido", "gracia"].includes(
+                    periodo.estado,
+                  );
 
-                return (
-                  <tr
-                    key={periodo.id}
-                    className={`${estilo.fila} hover:bg-gray-50`}
-                  >
-                    <td className="px-4 py-3 text-gray-500">{index + 1}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-block w-3 h-3 rounded-full ${estilo.dot}`}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">
-                        {periodo.cuenta?.cliente?.nombre}
-                      </p>
-                      {periodo.cuenta?.cliente?.telefono && (
-                        <p className="text-xs text-gray-500">
-                          {periodo.cuenta.cliente.telefono}
+                  return (
+                    <tr
+                      key={periodo.id}
+                      className={`${estilo.fila} hover:bg-gray-50`}
+                    >
+                      <td className="px-4 py-3 text-gray-500">{index + 1}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-block w-3 h-3 rounded-full ${estilo.dot}`}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-900">
+                          {periodo.cuenta?.cliente?.nombre}
                         </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {formatFecha(periodo.fecha_vencimiento)}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {ajustado ? "—" : formatPrice(esperado)}
-                      {periodo.monto_arrastre > 0 && !ajustado && (
-                        <span className="block text-xs text-blue-600">
-                          incluye {formatPrice(periodo.monto_arrastre)} aplazado
-                        </span>
-                      )}
-                      {periodo.monto_recargo > 0 && !ajustado && (
-                        <span className="block text-xs text-purple-600">
-                          incluye {formatPrice(periodo.monto_recargo)} diferido
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {formatPrice(pagado)}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {ajustado ? "—" : formatPrice(falta)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2 py-1 text-xs uppercase tracking-wider ${estilo.badge}`}
-                      >
-                        {estilo.texto}
-                      </span>
-                      {!ajustado &&
-                        periodo.estado !== "pagado" &&
-                        diasDeAtraso(periodo) > 0 && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            {diasDeAtraso(periodo)} días de atraso
+                        {periodo.cuenta?.cliente?.telefono && (
+                          <p className="text-xs text-gray-500">
+                            {periodo.cuenta.cliente.telefono}
                           </p>
                         )}
-                      {periodo.notas && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {periodo.notas}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-900">
-                      {formatPrice(periodo.cuenta?.saldo || 0)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/admin/clientes/${periodo.cuenta?.cliente?.id}`}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Ver cuenta
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {formatFecha(periodo.fecha_vencimiento)}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-gray-900">
+                        {ajustado ? "—" : formatPrice(esperado)}
+                        {periodo.monto_arrastre > 0 && !ajustado && (
+                          <span className="block text-xs text-blue-600">
+                            incluye {formatPrice(periodo.monto_arrastre)}{" "}
+                            aplazado
+                          </span>
+                        )}
+                        {periodo.monto_recargo > 0 && !ajustado && (
+                          <span className="block text-xs text-purple-600">
+                            incluye {formatPrice(periodo.monto_recargo)}{" "}
+                            diferido
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {formatPrice(pagado)}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-gray-900">
+                        {ajustado ? "—" : formatPrice(falta)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-2 py-1 text-xs uppercase tracking-wider ${estilo.badge}`}
+                        >
+                          {estilo.texto}
+                        </span>
+                        {!ajustado &&
+                          periodo.estado !== "pagado" &&
+                          diasDeAtraso(periodo) > 0 && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              {diasDeAtraso(periodo)} días de atraso
+                            </p>
+                          )}
+                        {periodo.notas && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {periodo.notas}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-900">
+                        {formatPrice(periodo.cuenta?.saldo || 0)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/admin/clientes/${periodo.cuenta?.cliente?.id}`}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Ver cuenta
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -394,75 +398,77 @@ export default function CuentasPage() {
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  #
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Cliente
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Saldo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Cuota
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Día de pago
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Meses restantes
-                </th>
-                <th className="px-6 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {cuentasOrdenadas.map((cuenta, index) => {
-                const saldo = parseFloat(cuenta.saldo) || 0;
-                const cuota = parseFloat(cuenta.cuota_mensual) || 0;
-                const meses = cuota > 0 ? Math.ceil(saldo / cuota) : 0;
-                return (
-                  <tr key={cuenta.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-gray-500">{index + 1}</td>
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-gray-900">
-                        {cuenta.cliente?.nombre}
-                      </p>
-                      {cuenta.cliente?.telefono && (
-                        <p className="text-xs text-gray-500">
-                          {cuenta.cliente.telefono}
+          <div className="tabla-scroll">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    #
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Cliente
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Saldo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Cuota
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Día de pago
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Meses restantes
+                  </th>
+                  <th className="px-6 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {cuentasOrdenadas.map((cuenta, index) => {
+                  const saldo = parseFloat(cuenta.saldo) || 0;
+                  const cuota = parseFloat(cuenta.cuota_mensual) || 0;
+                  const meses = cuota > 0 ? Math.ceil(saldo / cuota) : 0;
+                  return (
+                    <tr key={cuenta.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-gray-500">{index + 1}</td>
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-gray-900">
+                          {cuenta.cliente?.nombre}
                         </p>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {formatPrice(saldo)}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {formatPrice(cuota)}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      Día {cuenta.dia_pago}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {saldo > 0
-                        ? `${meses} ${meses === 1 ? "mes" : "meses"}`
-                        : "Al día"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <Link
-                        href={`/admin/clientes/${cuenta.cliente?.id}`}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Ver cuenta
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        {cuenta.cliente?.telefono && (
+                          <p className="text-xs text-gray-500">
+                            {cuenta.cliente.telefono}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 font-medium text-gray-900">
+                        {formatPrice(saldo)}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {formatPrice(cuota)}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        Día {cuenta.dia_pago}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {saldo > 0
+                          ? `${meses} ${meses === 1 ? "mes" : "meses"}`
+                          : "Al día"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <Link
+                          href={`/admin/clientes/${cuenta.cliente?.id}`}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Ver cuenta
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

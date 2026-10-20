@@ -1,4 +1,5 @@
 "use client";
+import BotonLimpiarBorrador from "@/components/admin/BotonLimpiarBorrador";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
@@ -45,6 +46,17 @@ export default function ConjuntoForm({ conjunto = null }) {
     if (!borradorCargado || typeof window === "undefined") return;
     localStorage.setItem(storageKey, JSON.stringify(formData));
   }, [formData, borradorCargado, storageKey]);
+
+  // En edición vuelve a los datos guardados; en nuevo, deja todo vacío.
+  const limpiarFormulario = () => {
+    localStorage.removeItem(storageKey);
+    setFormData({
+      nombre: conjunto?.nombre || "",
+      descripcion: conjunto?.descripcion || "",
+      imagen_url: conjunto?.imagen_url || "",
+      imagen_public_id: conjunto?.imagen_public_id || "",
+    });
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -166,6 +178,10 @@ export default function ConjuntoForm({ conjunto = null }) {
           productCode={formData.nombre}
           requireCode={false}
         />
+      </div>
+
+      <div className="flex justify-end">
+        <BotonLimpiarBorrador onLimpiar={limpiarFormulario} />
       </div>
 
       <div className="flex justify-end space-x-4">

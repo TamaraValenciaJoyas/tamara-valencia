@@ -14,6 +14,7 @@ import {
   MATERIALES_PRODUCTO,
 } from "@/lib/constants";
 import Link from "next/link";
+import BotonLimpiarBorrador from "@/components/admin/BotonLimpiarBorrador";
 
 const VIAS_VENTA = [
   { value: "showroom", label: "Showroom" },
@@ -142,6 +143,24 @@ export default function NuevaVentaPage() {
     fechaPrimerPago,
     notas,
   ]);
+
+  const limpiarFormulario = () => {
+    localStorage.removeItem("venta_nueva_borrador");
+    setProductosSeleccionados([]);
+    setMostrarItemManual(false);
+    setClienteSeleccionado(null);
+    setBusquedaCliente("");
+    setClientesEncontrados([]);
+    setFecha(hoyStr());
+    setDescuento("");
+    setVia("");
+    setDistribuidoraId("");
+    setEsCredito(false);
+    setCuotaMensual("");
+    setDiaPago("1");
+    setFechaPrimerPago("");
+    setNotas("");
+  };
 
   // Al seleccionar un cliente, revisar si ya tiene cuenta abierta
   useEffect(() => {
@@ -495,9 +514,12 @@ export default function NuevaVentaPage() {
         </button>
       </div>
 
-      <h1 className="font-elegant text-4xl font-light text-gray-900 mb-6">
-        Nueva Venta
-      </h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="font-elegant text-4xl font-light text-gray-900">
+          Nueva Venta
+        </h1>
+        <BotonLimpiarBorrador onLimpiar={limpiarFormulario} />
+      </div>
 
       <div className="bg-white border border-gray-200 p-6 mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -620,67 +642,71 @@ export default function NuevaVentaPage() {
                 No se encontraron productos
               </p>
             ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                      #
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                      Código
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                      Nombre
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                      Material
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                      Precio
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                      Stock
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {productosResultado.map((producto, index) => {
-                    const precio = calcularPrecio(producto);
-                    const yaAgregado = productosSeleccionados.find(
-                      (p) => p.id_producto === producto.id,
-                    );
-                    return (
-                      <tr key={producto.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-gray-500">{index + 1}</td>
-                        <td className="px-4 py-2 text-gray-900">
-                          {producto.codigo}
-                        </td>
-                        <td className="px-4 py-2 text-gray-900">
-                          {producto.nombre_comercial}
-                        </td>
-                        <td className="px-4 py-2 text-gray-600">
-                          {producto.material}
-                        </td>
-                        <td className="px-4 py-2 text-gray-900 font-medium">
-                          {formatPrice(precio)}
-                        </td>
-                        <td className="px-4 py-2 text-gray-600">
-                          {producto.stock}
-                        </td>
-                        <td className="px-4 py-2">
-                          <button
-                            onClick={() => agregarProducto(producto)}
-                            className="px-3 py-1 bg-gray-900 text-white text-xs uppercase tracking-wider hover:bg-gray-700 transition-colors"
-                          >
-                            {yaAgregado ? "Agregar más" : "Agregar"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div className="tabla-scroll">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                        #
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                        Código
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                        Nombre
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                        Material
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                        Precio
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                        Stock
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {productosResultado.map((producto, index) => {
+                      const precio = calcularPrecio(producto);
+                      const yaAgregado = productosSeleccionados.find(
+                        (p) => p.id_producto === producto.id,
+                      );
+                      return (
+                        <tr key={producto.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-gray-500">
+                            {index + 1}
+                          </td>
+                          <td className="px-4 py-2 text-gray-900">
+                            {producto.codigo}
+                          </td>
+                          <td className="px-4 py-2 text-gray-900">
+                            {producto.nombre_comercial}
+                          </td>
+                          <td className="px-4 py-2 text-gray-600">
+                            {producto.material}
+                          </td>
+                          <td className="px-4 py-2 text-gray-900 font-medium">
+                            {formatPrice(precio)}
+                          </td>
+                          <td className="px-4 py-2 text-gray-600">
+                            {producto.stock}
+                          </td>
+                          <td className="px-4 py-2">
+                            <button
+                              onClick={() => agregarProducto(producto)}
+                              className="px-3 py-1 bg-gray-900 text-white text-xs uppercase tracking-wider hover:bg-gray-700 transition-colors"
+                            >
+                              {yaAgregado ? "Agregar más" : "Agregar"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
@@ -787,89 +813,91 @@ export default function NuevaVentaPage() {
             No hay productos agregados aún
           </p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  #
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Código
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Nombre
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Precio
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Cantidad
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Subtotal
-                </th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {productosSeleccionados.map((p, index) => (
-                <tr key={p.id_producto || p.id_temporal}>
-                  <td className="px-4 py-2 text-gray-500">{index + 1}</td>
-                  <td className="px-4 py-2 text-gray-900">
-                    {p.codigo || (
-                      <span className="text-xs text-gray-400 italic">
-                        Manual
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-gray-900">{p.nombre}</td>
-                  <td className="px-4 py-2 text-gray-900">
-                    {formatPrice(p.precio_unitario)}
-                  </td>
-                  <td className="px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() =>
-                          cambiarCantidad(
-                            p.id_producto || p.id_temporal,
-                            p.cantidad - 1,
-                          )
-                        }
-                        className="w-7 h-7 border border-gray-300 hover:bg-gray-100 flex items-center justify-center text-gray-700"
-                      >
-                        -
-                      </button>
-                      <span className="w-8 text-center">{p.cantidad}</span>
-                      <button
-                        onClick={() =>
-                          cambiarCantidad(
-                            p.id_producto || p.id_temporal,
-                            p.cantidad + 1,
-                          )
-                        }
-                        className="w-7 h-7 border border-gray-300 hover:bg-gray-100 flex items-center justify-center text-gray-700"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 font-medium text-gray-900">
-                    {formatPrice(p.precio_unitario * p.cantidad)}
-                  </td>
-                  <td className="px-4 py-2">
-                    <button
-                      onClick={() =>
-                        quitarProducto(p.id_producto || p.id_temporal)
-                      }
-                      className="text-red-600 hover:text-red-900 text-xs uppercase tracking-wider"
-                    >
-                      Quitar
-                    </button>
-                  </td>
+          <div className="tabla-scroll">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    #
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Código
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Nombre
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Precio
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Cantidad
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Subtotal
+                  </th>
+                  <th className="px-4 py-2"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {productosSeleccionados.map((p, index) => (
+                  <tr key={p.id_producto || p.id_temporal}>
+                    <td className="px-4 py-2 text-gray-500">{index + 1}</td>
+                    <td className="px-4 py-2 text-gray-900">
+                      {p.codigo || (
+                        <span className="text-xs text-gray-400 italic">
+                          Manual
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-gray-900">{p.nombre}</td>
+                    <td className="px-4 py-2 text-gray-900">
+                      {formatPrice(p.precio_unitario)}
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() =>
+                            cambiarCantidad(
+                              p.id_producto || p.id_temporal,
+                              p.cantidad - 1,
+                            )
+                          }
+                          className="w-7 h-7 border border-gray-300 hover:bg-gray-100 flex items-center justify-center text-gray-700"
+                        >
+                          -
+                        </button>
+                        <span className="w-8 text-center">{p.cantidad}</span>
+                        <button
+                          onClick={() =>
+                            cambiarCantidad(
+                              p.id_producto || p.id_temporal,
+                              p.cantidad + 1,
+                            )
+                          }
+                          className="w-7 h-7 border border-gray-300 hover:bg-gray-100 flex items-center justify-center text-gray-700"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 font-medium text-gray-900">
+                      {formatPrice(p.precio_unitario * p.cantidad)}
+                    </td>
+                    <td className="px-4 py-2">
+                      <button
+                        onClick={() =>
+                          quitarProducto(p.id_producto || p.id_temporal)
+                        }
+                        className="text-red-600 hover:text-red-900 text-xs uppercase tracking-wider"
+                      >
+                        Quitar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

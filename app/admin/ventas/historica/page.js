@@ -7,6 +7,7 @@ import { getDistribuidoras } from "@/lib/supabase/distribuidoras";
 import { registrarVentaHistorica } from "@/lib/supabase/ventas";
 import { getCuentaPorCliente } from "@/lib/supabase/cuentas";
 import { formatPrice } from "@/utils/formatters";
+import BotonLimpiarBorrador from "@/components/admin/BotonLimpiarBorrador";
 
 const VIAS_VENTA = [
   { value: "showroom", label: "Showroom" },
@@ -70,6 +71,22 @@ export default function VentaHistoricaPage() {
     }
     setBorradorCargado(true);
   }, []);
+
+  const limpiarFormulario = () => {
+    localStorage.removeItem("venta_historica_borrador");
+    setFecha("");
+    setTotal("");
+    setVia("");
+    setDistribuidoraId("");
+    setDescripcion("");
+    setClienteSeleccionado(null);
+    setBusquedaCliente("");
+    setClientesEncontrados([]);
+    setEsCredito(false);
+    setCuotaMensual("");
+    setDiaPago("1");
+    setFechaPrimerPago("");
+  };
 
   useEffect(() => {
     if (!borradorCargado || typeof window === "undefined") return;
@@ -239,9 +256,12 @@ export default function VentaHistoricaPage() {
         </button>
       </div>
 
-      <h1 className="font-elegant text-4xl font-light text-gray-900 mb-2">
-        Registro Histórico
-      </h1>
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="font-elegant text-4xl font-light text-gray-900">
+          Registro Histórico
+        </h1>
+        <BotonLimpiarBorrador onLimpiar={limpiarFormulario} />
+      </div>
       <p className="text-gray-500 mb-10">
         Para registrar ventas anteriores al sistema. No afecta el inventario ni
         descuenta stock.

@@ -429,7 +429,7 @@ export default function ReportesPage() {
             </ResponsiveContainer>
 
             {/* Tabla con el detalle */}
-            <div className="mt-6 overflow-x-auto">
+            <div className="mt-6 tabla-scroll">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -617,7 +617,7 @@ export default function ReportesPage() {
               <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
                 Mejores Clientes
               </h3>
-              <div className="bg-white border border-gray-200 overflow-hidden">
+              <div className="bg-white border border-gray-200 tabla-scroll">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
@@ -674,52 +674,54 @@ export default function ReportesPage() {
                     Todos los clientes han comprado recientemente
                   </p>
                 ) : (
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                          #
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                          Cliente
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                          Sin comprar
-                        </th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 uppercase">
-                          Compró
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {comportamiento.inactivos.map((c, index) => (
-                        <tr key={c.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 text-gray-500">
-                            {index + 1}
-                          </td>
-                          <td className="px-4 py-2">
-                            <Link
-                              href={`/admin/clientes/${c.id}`}
-                              className="text-gray-900 hover:text-blue-600"
-                            >
-                              {c.nombre}
-                            </Link>
-                            {c.telefono && (
-                              <p className="text-xs text-gray-500">
-                                {c.telefono}
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-4 py-2 text-gray-600">
-                            {Math.floor(c.diasDesdeUltima / 30)} meses
-                          </td>
-                          <td className="px-4 py-2 text-right text-gray-600">
-                            {formatCurrency(c.totalGastado)}
-                          </td>
+                  <div className="tabla-scroll">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                            #
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                            Cliente
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                            Sin comprar
+                          </th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 uppercase">
+                            Compró
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {comportamiento.inactivos.map((c, index) => (
+                          <tr key={c.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-gray-500">
+                              {index + 1}
+                            </td>
+                            <td className="px-4 py-2">
+                              <Link
+                                href={`/admin/clientes/${c.id}`}
+                                className="text-gray-900 hover:text-blue-600"
+                              >
+                                {c.nombre}
+                              </Link>
+                              {c.telefono && (
+                                <p className="text-xs text-gray-500">
+                                  {c.telefono}
+                                </p>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-gray-600">
+                              {Math.floor(c.diasDesdeUltima / 30)} meses
+                            </td>
+                            <td className="px-4 py-2 text-right text-gray-600">
+                              {formatCurrency(c.totalGastado)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -753,7 +755,7 @@ export default function ReportesPage() {
       <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">
         Egresos Mensuales — {año}
       </h2>
-      <div className="bg-white border border-gray-200 overflow-hidden">
+      <div className="bg-white border border-gray-200 tabla-scroll">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>

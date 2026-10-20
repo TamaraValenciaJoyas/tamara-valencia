@@ -89,12 +89,12 @@ export default function PrestamosPage() {
       </div>
 
       {/* Tabla */}
-      <div className="bg-white border border-gray-200 overflow-hidden">
+      <div className="bg-white border border-gray-200 tabla-scroll">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                #
+                N°
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                 Distribuidora
@@ -114,9 +114,11 @@ export default function PrestamosPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {prestamos.map((prestamo, index) => (
+            {prestamos.map((prestamo) => (
               <tr key={prestamo.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm text-gray-500">{index + 1}</td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {prestamo.numero || "-"}
+                </td>
                 <td className="px-6 py-4">
                   <p className="text-sm font-medium text-gray-900">
                     {prestamo.distribuidora?.nombre}

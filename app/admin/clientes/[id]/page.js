@@ -115,63 +115,65 @@ export default function DetalleClientePage({ params }) {
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  #
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Fecha
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Vía
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Total
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Pago
-                </th>
-                <th className="px-6 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {ventas.map((venta, index) => (
-                <tr key={venta.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-gray-500">{index + 1}</td>
-                  <td className="px-6 py-4 text-gray-900">
-                    {formatFecha(venta.fecha)}
-                  </td>
-                  <td className="px-6 py-4 text-gray-600">
-                    {VIAS_LABEL[venta.via] || venta.via}
-                  </td>
-                  <td className="px-6 py-4 font-medium text-gray-900">
-                    {formatPrice(venta.total)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 text-xs uppercase tracking-wider ${
-                        venta.es_credito
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-green-100 text-green-800"
-                      }`}
-                    >
-                      {venta.es_credito ? "Crédito" : "Contado"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Link
-                      href={`/admin/ventas/${venta.id}`}
-                      className="text-blue-600 hover:text-blue-900"
-                    >
-                      Ver
-                    </Link>
-                  </td>
+          <div className="tabla-scroll">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    #
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Fecha
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Vía
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Total
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Pago
+                  </th>
+                  <th className="px-6 py-3"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {ventas.map((venta, index) => (
+                  <tr key={venta.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-gray-500">{index + 1}</td>
+                    <td className="px-6 py-4 text-gray-900">
+                      {formatFecha(venta.fecha)}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {VIAS_LABEL[venta.via] || venta.via}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-gray-900">
+                      {formatPrice(venta.total)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-2 py-1 text-xs uppercase tracking-wider ${
+                          venta.es_credito
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-green-100 text-green-800"
+                        }`}
+                      >
+                        {venta.es_credito ? "Crédito" : "Contado"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Link
+                        href={`/admin/ventas/${venta.id}`}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        Ver
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
