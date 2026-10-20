@@ -173,80 +173,84 @@ export default function DetalleDistribuidoraPage({ params }) {
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  #
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Fecha
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Cliente
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Concepto
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Base
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Comisión
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  Estado
-                </th>
-                <th className="px-6 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {comisiones.map((c, index) => (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-gray-500">{index + 1}</td>
-                  <td className="px-6 py-4 text-gray-600">
-                    {formatFecha(c.fecha)}
-                  </td>
-                  <td className="px-6 py-4 text-gray-900">
-                    {c.cliente?.nombre || "-"}
-                  </td>
-                  <td className="px-6 py-4 text-gray-600">{c.notas || "-"}</td>
-                  <td className="px-6 py-4 text-right text-gray-600">
-                    {formatPrice(c.base)}
-                  </td>
-                  <td className="px-6 py-4 text-right font-medium text-gray-900">
-                    {formatPrice(c.monto)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 text-xs uppercase tracking-wider ${
-                        c.estado === "pagada"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-orange-100 text-orange-800"
-                      }`}
-                    >
-                      {c.estado === "pagada" ? "Pagada" : "Por cobrar"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <button
-                      onClick={() => handleToggle(c.id, c.estado)}
-                      disabled={procesando}
-                      className={`text-sm ${
-                        c.estado === "pagada"
-                          ? "text-gray-500 hover:text-gray-700"
-                          : "text-blue-600 hover:text-blue-900"
-                      } disabled:opacity-40`}
-                    >
-                      {c.estado === "pagada"
-                        ? "Marcar por cobrar"
-                        : "Marcar pagada"}
-                    </button>
-                  </td>
+          <div className="tabla-scroll">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    #
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Fecha
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Cliente
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Concepto
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Base
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Comisión
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Estado
+                  </th>
+                  <th className="px-6 py-3"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {comisiones.map((c, index) => (
+                  <tr key={c.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-gray-500">{index + 1}</td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {formatFecha(c.fecha)}
+                    </td>
+                    <td className="px-6 py-4 text-gray-900">
+                      {c.cliente?.nombre || "-"}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {c.notas || "-"}
+                    </td>
+                    <td className="px-6 py-4 text-right text-gray-600">
+                      {formatPrice(c.base)}
+                    </td>
+                    <td className="px-6 py-4 text-right font-medium text-gray-900">
+                      {formatPrice(c.monto)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-2 py-1 text-xs uppercase tracking-wider ${
+                          c.estado === "pagada"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-orange-100 text-orange-800"
+                        }`}
+                      >
+                        {c.estado === "pagada" ? "Pagada" : "Por cobrar"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => handleToggle(c.id, c.estado)}
+                        disabled={procesando}
+                        className={`text-sm ${
+                          c.estado === "pagada"
+                            ? "text-gray-500 hover:text-gray-700"
+                            : "text-blue-600 hover:text-blue-900"
+                        } disabled:opacity-40`}
+                      >
+                        {c.estado === "pagada"
+                          ? "Marcar por cobrar"
+                          : "Marcar pagada"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

@@ -610,7 +610,7 @@ export default function ProductosAdminPage() {
               {productos.length === 1 ? "producto" : "productos"}
             </p>
           </div>
-          <div className="overflow-x-auto">
+          <div className="tabla-scroll">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>

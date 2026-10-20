@@ -583,91 +583,97 @@ export default function CuentaCliente({ cliente }) {
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  #
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Mes
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Vence
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Esperado
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Pagado
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Estado
-                </th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {periodos.map((p, index) => {
-                const est =
-                  ESTADO_PERIODO[p.estado] || ESTADO_PERIODO.pendiente;
-                const puedeAjustar = ["pendiente", "parcial", "mora"].includes(
-                  p.estado,
-                );
-                return (
-                  <tr key={p.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 text-gray-500">{index + 1}</td>
-                    <td className="px-4 py-2 text-gray-900">
-                      {MESES[p.mes - 1]} {p.anio}
-                    </td>
-                    <td className="px-4 py-2 text-gray-600">
-                      {formatFecha(p.fecha_vencimiento)}
-                    </td>
-                    <td className="px-4 py-2 text-gray-900">
-                      {formatPrice(p.monto_esperado)}
-                      {parseFloat(p.monto_arrastre) > 0 && (
-                        <span className="block text-xs text-blue-600">
-                          +{formatPrice(p.monto_arrastre)} aplazado
-                        </span>
-                      )}
-                      {parseFloat(p.monto_recargo) > 0 && (
-                        <span className="block text-xs text-purple-600">
-                          +{formatPrice(p.monto_recargo)} diferido
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-gray-600">
-                      {formatPrice(p.monto_pagado)}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`px-2 py-1 text-xs uppercase tracking-wider ${est.cls}`}
-                      >
-                        {est.texto}
-                      </span>
-                      {p.notas && (
-                        <p className="text-xs text-gray-500 mt-1">{p.notas}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-2">
-                      {puedeAjustar && (
-                        <button
-                          onClick={() => {
-                            setPeriodoAjustar(p);
-                            setFormAjuste({ accion: "aplazar", notas: "" });
-                            setModal("ajuste");
-                          }}
-                          className="text-blue-600 hover:text-blue-900 text-xs"
+          <div className="tabla-scroll">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    #
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Mes
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Vence
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Esperado
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Pagado
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Estado
+                  </th>
+                  <th className="px-4 py-2"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {periodos.map((p, index) => {
+                  const est =
+                    ESTADO_PERIODO[p.estado] || ESTADO_PERIODO.pendiente;
+                  const puedeAjustar = [
+                    "pendiente",
+                    "parcial",
+                    "mora",
+                  ].includes(p.estado);
+                  return (
+                    <tr key={p.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 text-gray-500">{index + 1}</td>
+                      <td className="px-4 py-2 text-gray-900">
+                        {MESES[p.mes - 1]} {p.anio}
+                      </td>
+                      <td className="px-4 py-2 text-gray-600">
+                        {formatFecha(p.fecha_vencimiento)}
+                      </td>
+                      <td className="px-4 py-2 text-gray-900">
+                        {formatPrice(p.monto_esperado)}
+                        {parseFloat(p.monto_arrastre) > 0 && (
+                          <span className="block text-xs text-blue-600">
+                            +{formatPrice(p.monto_arrastre)} aplazado
+                          </span>
+                        )}
+                        {parseFloat(p.monto_recargo) > 0 && (
+                          <span className="block text-xs text-purple-600">
+                            +{formatPrice(p.monto_recargo)} diferido
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-gray-600">
+                        {formatPrice(p.monto_pagado)}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={`px-2 py-1 text-xs uppercase tracking-wider ${est.cls}`}
                         >
-                          Ajustar mes
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                          {est.texto}
+                        </span>
+                        {p.notas && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {p.notas}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-2">
+                        {puedeAjustar && (
+                          <button
+                            onClick={() => {
+                              setPeriodoAjustar(p);
+                              setFormAjuste({ accion: "aplazar", notas: "" });
+                              setModal("ajuste");
+                            }}
+                            className="text-blue-600 hover:text-blue-900 text-xs"
+                          >
+                            Ajustar mes
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -680,118 +686,120 @@ export default function CuentaCliente({ cliente }) {
             <p className="text-gray-500 text-sm">Sin movimientos aún</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  #
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Fecha
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Concepto
-                </th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 uppercase">
-                  Cargo
-                </th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 uppercase">
-                  Abono
-                </th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 uppercase">
-                  Saldo
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {movimientos.map((mov, index) => {
-                const tipo = TIPO_MOV[mov.tipo] || TIPO_MOV.cargo;
-                return (
-                  <tr key={mov.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 text-gray-500">{index + 1}</td>
-                    <td className="px-4 py-2 text-gray-600">
-                      <div className="flex items-center gap-2">
-                        {formatFecha(mov.fecha)}
-                        {mov.tipo === "abono" &&
-                          mov.concepto === "Pago recibido" && (
-                            <button
-                              onClick={() => {
-                                setEditandoFechaPago(mov);
-                                setNuevaFechaPago(mov.fecha);
-                                setNuevoMontoPago(mov.monto.toString());
-                              }}
-                              title="Editar este pago"
-                              className="text-gray-400 hover:text-gray-900"
-                            >
-                              <svg
-                                className="w-3.5 h-3.5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+          <div className="tabla-scroll">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    #
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Fecha
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Concepto
+                  </th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 uppercase">
+                    Cargo
+                  </th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 uppercase">
+                    Abono
+                  </th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 uppercase">
+                    Saldo
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {movimientos.map((mov, index) => {
+                  const tipo = TIPO_MOV[mov.tipo] || TIPO_MOV.cargo;
+                  return (
+                    <tr key={mov.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 text-gray-500">{index + 1}</td>
+                      <td className="px-4 py-2 text-gray-600">
+                        <div className="flex items-center gap-2">
+                          {formatFecha(mov.fecha)}
+                          {mov.tipo === "abono" &&
+                            mov.concepto === "Pago recibido" && (
+                              <button
+                                onClick={() => {
+                                  setEditandoFechaPago(mov);
+                                  setNuevaFechaPago(mov.fecha);
+                                  setNuevoMontoPago(mov.monto.toString());
+                                }}
+                                title="Editar este pago"
+                                className="text-gray-400 hover:text-gray-900"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth="2"
-                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                />
-                              </svg>
-                            </button>
-                          )}
-                        {!mov.id_venta &&
-                          !(
-                            mov.tipo === "abono" &&
-                            mov.concepto === "Pago recibido"
-                          ) && (
-                            <button
-                              onClick={() => {
-                                setEditandoMovManual(mov);
-                                setFormEditarMov({
-                                  fecha: mov.fecha,
-                                  concepto: mov.concepto,
-                                  monto: mov.monto.toString(),
-                                });
-                              }}
-                              title="Editar este movimiento"
-                              className="text-gray-400 hover:text-gray-900"
-                            >
-                              <svg
-                                className="w-3.5 h-3.5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+                                <svg
+                                  className="w-3.5 h-3.5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                  />
+                                </svg>
+                              </button>
+                            )}
+                          {!mov.id_venta &&
+                            !(
+                              mov.tipo === "abono" &&
+                              mov.concepto === "Pago recibido"
+                            ) && (
+                              <button
+                                onClick={() => {
+                                  setEditandoMovManual(mov);
+                                  setFormEditarMov({
+                                    fecha: mov.fecha,
+                                    concepto: mov.concepto,
+                                    monto: mov.monto.toString(),
+                                  });
+                                }}
+                                title="Editar este movimiento"
+                                className="text-gray-400 hover:text-gray-900"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth="2"
-                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                />
-                              </svg>
-                            </button>
-                          )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className={tipo.cls}>{mov.concepto}</span>
-                      {mov.notas && (
-                        <p className="text-xs text-gray-500">{mov.notas}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-right text-gray-900">
-                      {mov.tipo !== "abono" ? formatPrice(mov.monto) : ""}
-                    </td>
-                    <td className="px-4 py-2 text-right text-green-700">
-                      {mov.tipo === "abono" ? formatPrice(mov.monto) : ""}
-                    </td>
-                    <td className="px-4 py-2 text-right font-medium text-gray-900">
-                      {formatPrice(mov.saldo_resultante)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                                <svg
+                                  className="w-3.5 h-3.5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                  />
+                                </svg>
+                              </button>
+                            )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className={tipo.cls}>{mov.concepto}</span>
+                        {mov.notas && (
+                          <p className="text-xs text-gray-500">{mov.notas}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-right text-gray-900">
+                        {mov.tipo !== "abono" ? formatPrice(mov.monto) : ""}
+                      </td>
+                      <td className="px-4 py-2 text-right text-green-700">
+                        {mov.tipo === "abono" ? formatPrice(mov.monto) : ""}
+                      </td>
+                      <td className="px-4 py-2 text-right font-medium text-gray-900">
+                        {formatPrice(mov.saldo_resultante)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -800,7 +808,7 @@ export default function CuentaCliente({ cliente }) {
           <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">
             Cambios de Cuota
           </h3>
-          <div className="bg-white border border-gray-200 overflow-hidden mb-8">
+          <div className="bg-white border border-gray-200 tabla-scroll mb-8">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase, getFactores } from "@/lib/supabase/client";
@@ -9,6 +9,50 @@ import {
   MATERIALES_PRODUCTO,
 } from "@/lib/constants";
 import ImageUploader from "./ImageUploader";
+import BotonLimpiarBorrador from "./BotonLimpiarBorrador";
+import {
+  prefijoCodigo,
+  esCodigoAutomatico,
+  formatearCodigo,
+  siguienteNumeroCodigo,
+  generarCodigoDisponible,
+} from "@/lib/codigoProducto";
+
+const FORM_VACIO = {
+  codigo: "",
+  tipo: "",
+  categoria: "",
+  nombre_comercial: "",
+  material: "",
+  peso: "",
+  descripcion: "",
+  observaciones: "",
+  talla: "",
+  id_conjunto: "",
+  id_factor: "",
+  activo: true,
+  imagen_url: "",
+  imagen_public_id: "",
+  stock: 1,
+};
+
+const datosDeProducto = (producto) => ({
+  codigo: producto.codigo || "",
+  tipo: producto.tipo || "",
+  categoria: producto.categoria || "",
+  nombre_comercial: producto.nombre_comercial || "",
+  material: producto.material || "",
+  peso: producto.peso || "",
+  descripcion: producto.descripcion || "",
+  observaciones: producto.observaciones || "",
+  talla: producto.talla || "",
+  id_conjunto: producto.id_conjunto || "",
+  id_factor: producto.id_factor || "",
+  activo: producto.activo ?? true,
+  imagen_url: producto.imagen_url || "",
+  imagen_public_id: producto.imagen_public_id || "",
+  stock: producto.stock ?? 1,
+});
 
 const limitarDecimales = (valor) => {
   if (valor === "") return valor;
@@ -35,52 +79,26 @@ export default function ProductForm({ producto = null }) {
   const storageKey = producto
     ? `producto_editar_borrador_${producto.id}`
     : "producto_nuevo_borrador";
-  const [formData, setFormData] = useState({
-    codigo: "",
-    tipo: "",
-    categoria: "",
-    nombre_comercial: "",
-    material: "",
-    peso: "",
-    descripcion: "",
-    observaciones: "",
-    talla: "",
-    id_conjunto: "",
-    id_factor: "",
-    activo: true,
-    imagen_url: "",
-    imagen_public_id: "",
-    stock: 1,
-  });
+  const [formData, setFormData] = useState(FORM_VACIO);
+  // El código automático solo aplica a productos nuevos y se deja de
+  // generar si se escribe a mano.
+  const [codigoManual, setCodigoManual] = useState(!!producto);
+  const siguienteNumero = useRef(null);
 
   useEffect(() => {
     fetchConjuntos();
     fetchFactores();
-    if (producto) {
-      setFormData({
-        codigo: producto.codigo || "",
-        tipo: producto.tipo || "",
-        categoria: producto.categoria || "",
-        nombre_comercial: producto.nombre_comercial || "",
-        material: producto.material || "",
-        peso: producto.peso || "",
-        descripcion: producto.descripcion || "",
-        observaciones: producto.observaciones || "",
-        talla: producto.talla || "",
-        id_conjunto: producto.id_conjunto || "",
-        id_factor: producto.id_factor || "",
-        activo: producto.activo ?? true,
-        imagen_url: producto.imagen_url || "",
-        imagen_public_id: producto.imagen_public_id || "",
-        stock: producto.stock ?? 1,
-      });
-    }
+    if (producto) setFormData(datosDeProducto(producto));
 
     if (typeof window !== "undefined") {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
         try {
-          setFormData(JSON.parse(raw));
+          const borrador = JSON.parse(raw);
+          setFormData(borrador);
+          if (!producto && borrador.codigo && !esCodigoAutomatico(borrador)) {
+            setCodigoManual(true);
+          }
         } catch (e) {
           console.error("Error al restaurar borrador:", e);
         }
@@ -93,6 +111,35 @@ export default function ProductForm({ producto = null }) {
     if (!borradorCargado || typeof window === "undefined") return;
     localStorage.setItem(storageKey, JSON.stringify(formData));
   }, [formData, borradorCargado, storageKey]);
+
+  const prefijo = prefijoCodigo(formData);
+
+  useEffect(() => {
+    if (!borradorCargado || codigoManual || !prefijo) return;
+    let cancelado = false;
+    const generar = async () => {
+      try {
+        if (siguienteNumero.current === null) {
+          siguienteNumero.current = await siguienteNumeroCodigo(supabase);
+        }
+        if (cancelado) return;
+        const codigo = formatearCodigo(prefijo, siguienteNumero.current);
+        setFormData((prev) => ({ ...prev, codigo }));
+      } catch (error) {
+        console.error("Error al generar el código:", error);
+      }
+    };
+    generar();
+    return () => {
+      cancelado = true;
+    };
+  }, [borradorCargado, codigoManual, prefijo]);
+
+  const limpiarFormulario = () => {
+    localStorage.removeItem(storageKey);
+    setFormData(producto ? datosDeProducto(producto) : FORM_VACIO);
+    setCodigoManual(!!producto);
+  };
 
   const fetchConjuntos = async () => {
     try {
@@ -137,6 +184,7 @@ export default function ProductForm({ producto = null }) {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    if (name === "codigo") setCodigoManual(true);
     setFormData({
       ...formData,
       [name]: type === "checkbox" ? checked : value,
@@ -178,8 +226,14 @@ export default function ProductForm({ producto = null }) {
     setLoading(true);
 
     try {
-      // Validar código duplicado
-      const codigoValido = await validateCodigo(formData.codigo);
+      // Se recalcula al guardar por si otro producto tomó el número
+      let codigoFinal = formData.codigo;
+      if (!producto && !codigoManual && prefijo) {
+        codigoFinal = await generarCodigoDisponible(supabase, prefijo);
+        setFormData((prev) => ({ ...prev, codigo: codigoFinal }));
+      }
+
+      const codigoValido = await validateCodigo(codigoFinal);
       if (!codigoValido) {
         alert("El código ya existe. Por favor, usa otro código.");
         setLoading(false);
@@ -201,6 +255,7 @@ export default function ProductForm({ producto = null }) {
 
       const dataToSave = {
         ...formData,
+        codigo: codigoFinal,
         peso: parseFloat(formData.peso),
         stock: parseInt(formData.stock),
         id_conjunto: formData.id_conjunto || null,
@@ -264,8 +319,24 @@ export default function ProductForm({ producto = null }) {
               onChange={handleChange}
               required
               className="w-full px-4 py-2 border border-gray-300 focus:outline-none focus:border-gray-500"
-              placeholder="TV-001"
+              placeholder={
+                producto ? "" : "Se genera al elegir tipo, categoría y material"
+              }
             />
+            {!producto &&
+              (codigoManual ? (
+                <button
+                  type="button"
+                  onClick={() => setCodigoManual(false)}
+                  className="text-xs text-blue-600 hover:text-blue-900 underline mt-1"
+                >
+                  Generar código automáticamente
+                </button>
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">
+                  Automático. Puedes cambiarlo si lo necesitas.
+                </p>
+              ))}
           </div>
 
           <div>
@@ -516,7 +587,8 @@ export default function ProductForm({ producto = null }) {
         />
       </div>
 
-      <div className="flex justify-end space-x-4">
+      <div className="flex justify-end space-x-4 items-center">
+        <BotonLimpiarBorrador onLimpiar={limpiarFormulario} />
         <button
           type="button"
           onClick={volverALista}

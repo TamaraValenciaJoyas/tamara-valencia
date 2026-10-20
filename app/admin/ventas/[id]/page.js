@@ -7,8 +7,11 @@ import {
   cambiarEstadoVenta,
   editarVentaContado,
   editarVentaCredito,
+  eliminarVenta,
+  cambiarVentaACredito,
+  cambiarVentaAContado,
 } from "@/lib/supabase/ventas";
-import { getCuentaPorCliente } from "@/lib/supabase/cuentas";
+import { getCuentaPorCliente, hoyStr } from "@/lib/supabase/cuentas";
 import { getDistribuidoras } from "@/lib/supabase/distribuidoras";
 import { buscarClientes } from "@/lib/supabase/clientes";
 import { supabase } from "@/lib/supabase/client";
@@ -73,6 +76,14 @@ export default function DetalleVentaPage({ params }) {
     precio: "",
     cantidad: "1",
   });
+  const [eliminando, setEliminando] = useState(false);
+  const [cambiandoTipo, setCambiandoTipo] = useState(false);
+  const [modalCuenta, setModalCuenta] = useState(false);
+  const [datosCuenta, setDatosCuenta] = useState({
+    cuota_mensual: "",
+    dia_pago: "1",
+    fecha_primer_pago: "",
+  });
 
   const { data: venta, isLoading } = useQuery({
     queryKey: ["venta", resolvedParams.id],
@@ -117,6 +128,141 @@ export default function DetalleVentaPage({ params }) {
     } catch (error) {
       console.error("Error al generar el PDF:", error);
       alert("Error al generar el PDF: " + error.message);
+    }
+  };
+
+  const handleEliminarVenta = async () => {
+    const detalleCredito = venta.es_credito
+      ? " También se quita la deuda de la cuenta del cliente."
+      : "";
+    if (
+      !confirm(
+        `¿Eliminar esta venta? Los productos vuelven al inventario.${detalleCredito}`,
+      )
+    )
+      return;
+    if (!confirm("Esto no se puede deshacer. ¿Seguro que quieres eliminarla?"))
+      return;
+
+    setEliminando(true);
+    try {
+      let resultado = await eliminarVenta(venta.id);
+      if (resultado.requiereConfirmacion) {
+        const confirmado = confirm(
+          `Al quitar esta venta el cliente queda con un saldo a favor de ${formatPrice(resultado.saldoFavor)} (pagó más de lo que debe). ¿Eliminar de todas formas?`,
+        );
+        if (!confirmado) {
+          setEliminando(false);
+          return;
+        }
+        resultado = await eliminarVenta(venta.id, {
+          confirmarSaldoFavor: true,
+        });
+      }
+      queryClient.invalidateQueries();
+      router.push("/admin/ventas");
+    } catch (error) {
+      console.error("Error al eliminar la venta:", error);
+      alert("No se pudo eliminar la venta: " + error.message);
+      setEliminando(false);
+    }
+  };
+
+  const terminarCambioTipo = () => {
+    queryClient.invalidateQueries();
+    setModalCuenta(false);
+    setCambiandoTipo(false);
+  };
+
+  const handlePasarACredito = async (datosNuevaCuenta = null) => {
+    setCambiandoTipo(true);
+    try {
+      const resultado = await cambiarVentaACredito(venta.id, {
+        datosNuevaCuenta,
+      });
+      if (resultado.requiereDatosCuenta) {
+        setDatosCuenta({
+          cuota_mensual: "",
+          dia_pago: "1",
+          fecha_primer_pago: hoyStr(),
+        });
+        setModalCuenta(true);
+        setCambiandoTipo(false);
+        return;
+      }
+      if (resultado.cuentaCerrada) {
+        alert(
+          "La venta se sumó a la cuenta del cliente, pero esa cuenta está cerrada. Reábrela en Cuentas para que se generen los meses de cobro.",
+        );
+      }
+      terminarCambioTipo();
+    } catch (error) {
+      console.error("Error al pasar a crédito:", error);
+      alert("No se pudo pasar a crédito: " + error.message);
+      setCambiandoTipo(false);
+    }
+  };
+
+  const handleConfirmarCuentaNueva = () => {
+    const cuota = parseFloat(datosCuenta.cuota_mensual);
+    if (!cuota || cuota <= 0) {
+      alert("La cuota mensual debe ser mayor a 0");
+      return;
+    }
+    if (!datosCuenta.fecha_primer_pago) {
+      alert("Indica la fecha del primer pago");
+      return;
+    }
+    handlePasarACredito({
+      cuota_mensual: cuota,
+      dia_pago: parseInt(datosCuenta.dia_pago, 10) || 1,
+      fecha_primer_pago: datosCuenta.fecha_primer_pago,
+    });
+  };
+
+  const handleCambiarTipo = async () => {
+    if (!venta.es_credito) {
+      if (
+        !confirm(
+          "¿Pasar esta venta a crédito? El total se suma a la cuenta del cliente y la comisión se generará con cada pago.",
+        )
+      )
+        return;
+      await handlePasarACredito();
+      return;
+    }
+
+    if (
+      !confirm(
+        "¿Pasar esta venta a contado? Se quita la deuda de la cuenta del cliente y la venta queda pagada.",
+      )
+    )
+      return;
+    setCambiandoTipo(true);
+    try {
+      let resultado = await cambiarVentaAContado(venta.id);
+      if (resultado.requiereConfirmacion) {
+        const confirmado = confirm(
+          `Con este cambio el cliente queda con un saldo a favor de ${formatPrice(resultado.saldoFavor)}. ¿Continuar?`,
+        );
+        if (!confirmado) {
+          setCambiandoTipo(false);
+          return;
+        }
+        resultado = await cambiarVentaAContado(venta.id, {
+          confirmarSaldoFavor: true,
+        });
+      }
+      if (resultado.avisoComisionNoGenerada) {
+        alert(
+          "La venta pasó a contado, pero no se pudo generar la comisión de la distribuidora. Revísala a mano.",
+        );
+      }
+      terminarCambioTipo();
+    } catch (error) {
+      console.error("Error al pasar a contado:", error);
+      alert("No se pudo pasar a contado: " + error.message);
+      setCambiandoTipo(false);
     }
   };
 
@@ -377,9 +523,16 @@ export default function DetalleVentaPage({ params }) {
       </div>
 
       <div className="flex items-center justify-between mb-8">
-        <h1 className="font-elegant text-4xl font-light text-gray-900">
-          Detalle de Venta
-        </h1>
+        <div>
+          <h1 className="font-elegant text-4xl font-light text-gray-900">
+            Detalle de Venta
+          </h1>
+          {venta.numero && (
+            <p className="text-sm text-gray-500 mt-1">
+              Venta N° {venta.numero}
+            </p>
+          )}
+        </div>
         <div className="flex items-center gap-4">
           {!editando && (
             <button
@@ -387,6 +540,15 @@ export default function DetalleVentaPage({ params }) {
               className="text-sm text-gray-700 hover:text-gray-900 underline"
             >
               Editar
+            </button>
+          )}
+          {!editando && venta.via !== "web" && (
+            <button
+              onClick={handleEliminarVenta}
+              disabled={eliminando}
+              className="text-sm text-red-600 hover:text-red-900 underline disabled:opacity-50"
+            >
+              {eliminando ? "Eliminando..." : "Eliminar"}
             </button>
           )}
           <button
@@ -454,6 +616,21 @@ export default function DetalleVentaPage({ params }) {
                 >
                   {venta.es_credito ? "Crédito" : "Contado"}
                 </span>
+                {venta.via !== "web" && (
+                  <div className="mt-2">
+                    <button
+                      onClick={handleCambiarTipo}
+                      disabled={cambiandoTipo}
+                      className="text-xs text-gray-600 hover:text-gray-900 underline disabled:opacity-50"
+                    >
+                      {cambiandoTipo
+                        ? "Cambiando..."
+                        : venta.es_credito
+                          ? "Pasar a contado"
+                          : "Pasar a crédito"}
+                    </button>
+                  </div>
+                )}
               </div>
               <div>
                 <p className="text-gray-500 uppercase tracking-wider text-xs mb-1">
@@ -511,65 +688,69 @@ export default function DetalleVentaPage({ params }) {
                 joyas
               </span>
             </div>
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    #
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Código
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Producto
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Descripción
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Material
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Precio
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Cantidad
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Subtotal
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {venta.detalle?.map((item, index) => (
-                  <tr key={item.id}>
-                    <td className="px-4 py-2 text-gray-500">{index + 1}</td>
-                    <td className="px-4 py-2 text-gray-600">
-                      {item.producto?.codigo || "-"}
-                    </td>
-                    <td className="px-4 py-2 text-gray-900">
-                      {item.producto?.nombre_comercial ||
-                        item.descripcion_manual ||
-                        "-"}
-                    </td>
-                    <td className="px-4 py-2 text-gray-600">
-                      {item.producto?.descripcion ||
-                        (!item.producto ? "Ítem manual" : "-")}
-                    </td>
-                    <td className="px-4 py-2 text-gray-600 capitalize">
-                      {item.producto?.material || "-"}
-                    </td>
-                    <td className="px-4 py-2 text-gray-900">
-                      {formatPrice(item.precio_unitario)}
-                    </td>
-                    <td className="px-4 py-2 text-gray-900">{item.cantidad}</td>
-                    <td className="px-4 py-2 font-medium text-gray-900">
-                      {formatPrice(item.subtotal)}
-                    </td>
+            <div className="tabla-scroll">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                      #
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                      Código
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                      Producto
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                      Descripción
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                      Material
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                      Precio
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                      Cantidad
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                      Subtotal
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {venta.detalle?.map((item, index) => (
+                    <tr key={item.id}>
+                      <td className="px-4 py-2 text-gray-500">{index + 1}</td>
+                      <td className="px-4 py-2 text-gray-600">
+                        {item.producto?.codigo || "-"}
+                      </td>
+                      <td className="px-4 py-2 text-gray-900">
+                        {item.producto?.nombre_comercial ||
+                          item.descripcion_manual ||
+                          "-"}
+                      </td>
+                      <td className="px-4 py-2 text-gray-600">
+                        {item.producto?.descripcion ||
+                          (!item.producto ? "Ítem manual" : "-")}
+                      </td>
+                      <td className="px-4 py-2 text-gray-600 capitalize">
+                        {item.producto?.material || "-"}
+                      </td>
+                      <td className="px-4 py-2 text-gray-900">
+                        {formatPrice(item.precio_unitario)}
+                      </td>
+                      <td className="px-4 py-2 text-gray-900">
+                        {item.cantidad}
+                      </td>
+                      <td className="px-4 py-2 font-medium text-gray-900">
+                        {formatPrice(item.subtotal)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Totales */}
@@ -833,80 +1014,82 @@ export default function DetalleVentaPage({ params }) {
               Productos
             </h2>
 
-            <table className="w-full text-sm mb-6">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Código
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Producto
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Precio
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Cantidad
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                    Subtotal
-                  </th>
-                  <th className="px-4 py-2"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {detalleEdit.map((item) => (
-                  <tr key={item.clave}>
-                    <td className="px-4 py-2 text-gray-600">
-                      {item.codigo || (
-                        <span className="text-xs text-gray-400 italic">
-                          Manual
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-gray-900">{item.nombre}</td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="number"
-                        value={item.precio_unitario}
-                        onChange={(e) =>
-                          handleCambiarPrecioEdit(
-                            item.clave,
-                            limitarDecimales(e.target.value),
-                          )
-                        }
-                        className="w-24 px-2 py-1 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.cantidad}
-                        onChange={(e) =>
-                          handleCambiarCantidadEdit(
-                            item.clave,
-                            parseInt(e.target.value, 10) || 1,
-                          )
-                        }
-                        className="w-16 px-2 py-1 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
-                      />
-                    </td>
-                    <td className="px-4 py-2 font-medium text-gray-900">
-                      {formatPrice(item.precio_unitario * item.cantidad)}
-                    </td>
-                    <td className="px-4 py-2">
-                      <button
-                        onClick={() => handleQuitarItemEdit(item.clave)}
-                        className="text-xs text-red-600 hover:text-red-900"
-                      >
-                        Quitar
-                      </button>
-                    </td>
+            <div className="tabla-scroll">
+              <table className="w-full text-sm mb-6">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                      Código
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                      Producto
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                      Precio
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                      Cantidad
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                      Subtotal
+                    </th>
+                    <th className="px-4 py-2"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {detalleEdit.map((item) => (
+                    <tr key={item.clave}>
+                      <td className="px-4 py-2 text-gray-600">
+                        {item.codigo || (
+                          <span className="text-xs text-gray-400 italic">
+                            Manual
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-gray-900">{item.nombre}</td>
+                      <td className="px-4 py-2">
+                        <input
+                          type="number"
+                          value={item.precio_unitario}
+                          onChange={(e) =>
+                            handleCambiarPrecioEdit(
+                              item.clave,
+                              limitarDecimales(e.target.value),
+                            )
+                          }
+                          className="w-24 px-2 py-1 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.cantidad}
+                          onChange={(e) =>
+                            handleCambiarCantidadEdit(
+                              item.clave,
+                              parseInt(e.target.value, 10) || 1,
+                            )
+                          }
+                          className="w-16 px-2 py-1 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                        />
+                      </td>
+                      <td className="px-4 py-2 font-medium text-gray-900">
+                        {formatPrice(item.precio_unitario * item.cantidad)}
+                      </td>
+                      <td className="px-4 py-2">
+                        <button
+                          onClick={() => handleQuitarItemEdit(item.clave)}
+                          className="text-xs text-red-600 hover:text-red-900"
+                        >
+                          Quitar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {/* Buscar y agregar producto */}
             <div className="flex gap-2 mb-4">
@@ -1064,6 +1247,84 @@ export default function DetalleVentaPage({ params }) {
             </button>
           </div>
         </>
+      )}
+
+      {modalCuenta && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white max-w-sm w-full p-6">
+            <h3 className="text-xl font-light text-gray-900 mb-2">
+              Abrir cuenta de crédito
+            </h3>
+            <p className="text-sm text-gray-500 mb-6">
+              {venta.cliente?.nombre} no tiene cuenta. Se abrirá una con esta
+              venta de {formatPrice(venta.total)}.
+            </p>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Cuota mensual
+                </label>
+                <input
+                  type="number"
+                  value={datosCuenta.cuota_mensual}
+                  onChange={(e) =>
+                    setDatosCuenta((p) => ({
+                      ...p,
+                      cuota_mensual: limitarDecimales(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Día de pago
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={datosCuenta.dia_pago}
+                  onChange={(e) =>
+                    setDatosCuenta((p) => ({ ...p, dia_pago: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Fecha del primer pago
+                </label>
+                <input
+                  type="date"
+                  value={datosCuenta.fecha_primer_pago}
+                  onChange={(e) =>
+                    setDatosCuenta((p) => ({
+                      ...p,
+                      fecha_primer_pago: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmarCuentaNueva}
+                disabled={cambiandoTipo}
+                className="flex-1 py-3 bg-gray-900 text-white text-sm uppercase tracking-wider hover:bg-gray-800 disabled:bg-gray-400"
+              >
+                {cambiandoTipo ? "Guardando..." : "Pasar a crédito"}
+              </button>
+              <button
+                onClick={() => setModalCuenta(false)}
+                className="px-6 py-3 border border-gray-300 text-gray-700 text-sm uppercase tracking-wider hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

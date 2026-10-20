@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { getDistribuidoras } from "@/lib/supabase/distribuidoras";
 import { registrarPrestamo } from "@/lib/supabase/prestamos";
 import { formatPrice } from "@/utils/formatters";
+import BotonLimpiarBorrador from "@/components/admin/BotonLimpiarBorrador";
 import {
   TIPOS_PRODUCTO,
   CATEGORIAS_PRODUCTO,
@@ -51,6 +52,23 @@ export default function NuevoPrestamoPage() {
 
   // Productos seleccionados para el préstamo
   const [seleccionados, setSeleccionados] = useState([]);
+  const [mostrarJoyaManual, setMostrarJoyaManual] = useState(false);
+  const [joyaManual, setJoyaManual] = useState({
+    descripcion: "",
+    precio: "",
+    cantidad: "1",
+  });
+
+  const claveDe = (p) => p.clave || p.id_producto;
+
+  const limpiarFormulario = () => {
+    localStorage.removeItem("prestamo_nuevo_borrador");
+    setDistribuidoraId("");
+    setNotas("");
+    setSeleccionados([]);
+    setMostrarJoyaManual(false);
+    setJoyaManual({ descripcion: "", precio: "", cantidad: "1" });
+  };
 
   useEffect(() => {
     if (!borradorCargado || typeof window === "undefined") return;
@@ -115,8 +133,42 @@ export default function NuevoPrestamoPage() {
     }
   };
 
+  const agregarJoyaManual = () => {
+    const precio = parseFloat(joyaManual.precio);
+    const cantidad = parseInt(joyaManual.cantidad, 10);
+    if (!joyaManual.descripcion.trim()) {
+      alert("Escribe una descripción para la joya");
+      return;
+    }
+    if (isNaN(precio) || precio <= 0) {
+      alert("El precio debe ser un número mayor a 0");
+      return;
+    }
+    if (isNaN(cantidad) || cantidad < 1) {
+      alert("La cantidad debe ser al menos 1");
+      return;
+    }
+    setSeleccionados((prev) => [
+      ...prev,
+      {
+        clave: `manual-${Date.now()}-${Math.random()}`,
+        esManual: true,
+        id_producto: null,
+        codigo: null,
+        nombre: joyaManual.descripcion.trim(),
+        precio,
+        cantidad,
+        stock: null,
+      },
+    ]);
+    setJoyaManual({ descripcion: "", precio: "", cantidad: "1" });
+    setMostrarJoyaManual(false);
+  };
+
   const agregarProducto = (producto) => {
-    const existe = seleccionados.find((p) => p.id_producto === producto.id);
+    const existe = seleccionados.find(
+      (p) => !p.esManual && p.id_producto === producto.id,
+    );
     if (existe) {
       if (existe.cantidad >= producto.stock) {
         alert(`Solo hay ${producto.stock} unidades disponibles`);
@@ -124,7 +176,7 @@ export default function NuevoPrestamoPage() {
       }
       setSeleccionados((prev) =>
         prev.map((p) =>
-          p.id_producto === producto.id
+          !p.esManual && p.id_producto === producto.id
             ? { ...p, cantidad: p.cantidad + 1 }
             : p,
         ),
@@ -144,22 +196,20 @@ export default function NuevoPrestamoPage() {
     }
   };
 
-  const cambiarCantidad = (idProducto, cantidad) => {
-    const producto = seleccionados.find((p) => p.id_producto === idProducto);
+  const cambiarCantidad = (clave, cantidad) => {
+    const producto = seleccionados.find((p) => claveDe(p) === clave);
     if (cantidad < 1) return;
-    if (cantidad > producto.stock) {
+    if (!producto.esManual && cantidad > producto.stock) {
       alert(`Solo hay ${producto.stock} unidades disponibles`);
       return;
     }
     setSeleccionados((prev) =>
-      prev.map((p) => (p.id_producto === idProducto ? { ...p, cantidad } : p)),
+      prev.map((p) => (claveDe(p) === clave ? { ...p, cantidad } : p)),
     );
   };
 
-  const quitarProducto = (idProducto) => {
-    setSeleccionados((prev) =>
-      prev.filter((p) => p.id_producto !== idProducto),
-    );
+  const quitarProducto = (clave) => {
+    setSeleccionados((prev) => prev.filter((p) => claveDe(p) !== clave));
   };
 
   const handleFiltroChange = (campo, valor) => {
@@ -178,7 +228,7 @@ export default function NuevoPrestamoPage() {
 
     if (
       !confirm(
-        "¿Confirmar el préstamo? El stock de estas joyas se descontará del inventario.",
+        "¿Confirmar el préstamo? El stock de las joyas del inventario se descontará.",
       )
     )
       return;
@@ -188,10 +238,16 @@ export default function NuevoPrestamoPage() {
       await registrarPrestamo({
         id_distribuidora: distribuidoraId,
         notas,
-        items: seleccionados.map((p) => ({
-          id_producto: p.id_producto,
-          cantidad: p.cantidad,
-        })),
+        items: seleccionados.map((p) =>
+          p.esManual
+            ? {
+                esManual: true,
+                descripcion: p.nombre,
+                precio: p.precio,
+                cantidad: p.cantidad,
+              }
+            : { id_producto: p.id_producto, cantidad: p.cantidad },
+        ),
       });
 
       alert("Préstamo registrado exitosamente");
@@ -218,9 +274,12 @@ export default function NuevoPrestamoPage() {
         </button>
       </div>
 
-      <h1 className="font-elegant text-4xl font-light text-gray-900 mb-10">
-        Nuevo Préstamo
-      </h1>
+      <div className="flex items-center justify-between mb-10">
+        <h1 className="font-elegant text-4xl font-light text-gray-900">
+          Nuevo Préstamo
+        </h1>
+        <BotonLimpiarBorrador onLimpiar={limpiarFormulario} />
+      </div>
 
       {/* SECCIÓN 1: DISTRIBUIDORA */}
       <div className="bg-white border border-gray-200 p-6 mb-6">
@@ -348,65 +407,70 @@ export default function NuevoPrestamoPage() {
                 No se encontraron joyas
               </p>
             ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                      #
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                      Código
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                      Nombre
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                      Material
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                      Precio
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                      Stock
-                    </th>
-                    <th className="px-4 py-2"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {productosResultado.map((producto) => {
-                    const yaAgregado = seleccionados.find(
-                      (p) => p.id_producto === producto.id,
-                    );
-                    return (
-                      <tr key={producto.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-gray-900">
-                          {producto.codigo}
-                        </td>
-                        <td className="px-4 py-2 text-gray-900">
-                          {producto.nombre_comercial}
-                        </td>
-                        <td className="px-4 py-2 text-gray-600">
-                          {producto.material}
-                        </td>
-                        <td className="px-4 py-2 text-gray-900 font-medium">
-                          {formatPrice(calcularPrecio(producto))}
-                        </td>
-                        <td className="px-4 py-2 text-gray-600">
-                          {producto.stock}
-                        </td>
-                        <td className="px-4 py-2">
-                          <button
-                            onClick={() => agregarProducto(producto)}
-                            className="px-3 py-1 bg-gray-900 text-white text-xs uppercase tracking-wider hover:bg-gray-700 transition-colors"
-                          >
-                            {yaAgregado ? "Agregar más" : "Agregar"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div className="tabla-scroll">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                        #
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                        Código
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                        Nombre
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                        Material
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                        Precio
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                        Stock
+                      </th>
+                      <th className="px-4 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {productosResultado.map((producto, index) => {
+                      const yaAgregado = seleccionados.find(
+                        (p) => !p.esManual && p.id_producto === producto.id,
+                      );
+                      return (
+                        <tr key={producto.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-gray-500">
+                            {index + 1}
+                          </td>
+                          <td className="px-4 py-2 text-gray-900">
+                            {producto.codigo}
+                          </td>
+                          <td className="px-4 py-2 text-gray-900">
+                            {producto.nombre_comercial}
+                          </td>
+                          <td className="px-4 py-2 text-gray-600">
+                            {producto.material}
+                          </td>
+                          <td className="px-4 py-2 text-gray-900 font-medium">
+                            {formatPrice(calcularPrecio(producto))}
+                          </td>
+                          <td className="px-4 py-2 text-gray-600">
+                            {producto.stock}
+                          </td>
+                          <td className="px-4 py-2">
+                            <button
+                              onClick={() => agregarProducto(producto)}
+                              className="px-3 py-1 bg-gray-900 text-white text-xs uppercase tracking-wider hover:bg-gray-700 transition-colors"
+                            >
+                              {yaAgregado ? "Agregar más" : "Agregar"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
@@ -421,63 +485,148 @@ export default function NuevoPrestamoPage() {
         {seleccionados.length === 0 ? (
           <p className="text-gray-500 text-sm">No hay joyas agregadas aún</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  #
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Código
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Nombre
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                  Cantidad
-                </th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {seleccionados.map((p, index) => (
-                <tr key={p.id_producto}>
-                  <td className="px-4 py-2 text-gray-500">{index + 1}</td>
-                  <td className="px-4 py-2 text-gray-900">{p.codigo}</td>
-                  <td className="px-4 py-2 text-gray-900">{p.nombre}</td>
-                  <td className="px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() =>
-                          cambiarCantidad(p.id_producto, p.cantidad - 1)
-                        }
-                        className="w-7 h-7 border border-gray-300 hover:bg-gray-100 flex items-center justify-center text-gray-700"
-                      >
-                        -
-                      </button>
-                      <span className="w-8 text-center">{p.cantidad}</span>
-                      <button
-                        onClick={() =>
-                          cambiarCantidad(p.id_producto, p.cantidad + 1)
-                        }
-                        className="w-7 h-7 border border-gray-300 hover:bg-gray-100 flex items-center justify-center text-gray-700"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2">
-                    <button
-                      onClick={() => quitarProducto(p.id_producto)}
-                      className="text-red-600 hover:text-red-900 text-xs uppercase tracking-wider"
-                    >
-                      Quitar
-                    </button>
-                  </td>
+          <div className="tabla-scroll">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    #
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Código
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Nombre
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                    Cantidad
+                  </th>
+                  <th className="px-4 py-2"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {seleccionados.map((p, index) => (
+                  <tr key={claveDe(p)}>
+                    <td className="px-4 py-2 text-gray-500">{index + 1}</td>
+                    <td className="px-4 py-2 text-gray-900">
+                      {p.codigo || (
+                        <span className="text-xs text-gray-400 italic">
+                          Manual
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-gray-900">{p.nombre}</td>
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() =>
+                            cambiarCantidad(claveDe(p), p.cantidad - 1)
+                          }
+                          className="w-7 h-7 border border-gray-300 hover:bg-gray-100 flex items-center justify-center text-gray-700"
+                        >
+                          -
+                        </button>
+                        <span className="w-8 text-center">{p.cantidad}</span>
+                        <button
+                          onClick={() =>
+                            cambiarCantidad(claveDe(p), p.cantidad + 1)
+                          }
+                          className="w-7 h-7 border border-gray-300 hover:bg-gray-100 flex items-center justify-center text-gray-700"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2">
+                      <button
+                        onClick={() => quitarProducto(claveDe(p))}
+                        className="text-red-600 hover:text-red-900 text-xs uppercase tracking-wider"
+                      >
+                        Quitar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {!mostrarJoyaManual ? (
+          <button
+            onClick={() => setMostrarJoyaManual(true)}
+            className="mt-4 text-sm text-blue-600 hover:text-blue-900 underline"
+          >
+            + Agregar joya sin registro en el sistema
+          </button>
+        ) : (
+          <div className="mt-4 border border-gray-200 p-4">
+            <p className="text-xs text-gray-500 mb-3">
+              Para joyas que no están en el inventario (por ejemplo, un arete
+              suelto). No mueve stock.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div className="md:col-span-2">
+                <label className="block text-xs text-gray-500 mb-1">
+                  Descripción
+                </label>
+                <input
+                  type="text"
+                  value={joyaManual.descripcion}
+                  onChange={(e) =>
+                    setJoyaManual((p) => ({
+                      ...p,
+                      descripcion: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Precio
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={joyaManual.precio}
+                  onChange={(e) =>
+                    setJoyaManual((p) => ({ ...p, precio: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Cantidad
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={joyaManual.cantidad}
+                  onChange={(e) =>
+                    setJoyaManual((p) => ({ ...p, cantidad: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={agregarJoyaManual}
+                className="px-4 py-2 bg-gray-900 text-white text-sm uppercase tracking-wider hover:bg-gray-800"
+              >
+                Agregar
+              </button>
+              <button
+                onClick={() => setMostrarJoyaManual(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm uppercase tracking-wider hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

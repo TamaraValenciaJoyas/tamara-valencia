@@ -1,4 +1,5 @@
 "use client";
+import BotonLimpiarBorrador from "@/components/admin/BotonLimpiarBorrador";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -63,6 +64,16 @@ export default function FactorForm({ factorId = null }) {
     if (!borradorCargado || typeof window === "undefined") return;
     localStorage.setItem(storageKey, JSON.stringify(formData));
   }, [formData, borradorCargado, storageKey]);
+
+  // En edición vuelve a los datos guardados; en nuevo, deja todo vacío.
+  const limpiarFormulario = () => {
+    localStorage.removeItem(storageKey);
+    if (factorId) {
+      fetchFactor();
+    } else {
+      setFormData({ nombre: "", valor: "" });
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -163,6 +174,10 @@ export default function FactorForm({ factorId = null }) {
       </div>
 
       {/* Botones */}
+      <div className="flex justify-end">
+        <BotonLimpiarBorrador onLimpiar={limpiarFormulario} />
+      </div>
+
       <div className="flex gap-4">
         <button
           type="submit"
